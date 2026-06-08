@@ -214,19 +214,29 @@ function handleReset() {
   var mSheet = ss.getSheetByName('modelos');
   mSheet.getRange(2, 1, defaultModels.length, 4).setValues(defaultModels);
 
-  // 5. Crear Lote Inicial de Carga
+  // 5. Crear 10 Lotes de Carga Inicial (Requisito: al menos 10 lotes)
   var lSheet = ss.getSheetByName('lotes');
-  var batchId = 'l-thor';
-  lSheet.appendRow([batchId, 'Lote Carga Inicial Thor', 'p-1', 0, '2026-06-08']);
+  var batchList = [];
+  var providerIds = ['p-1', 'p-2'];
+  for (var b = 1; b <= 10; b++) {
+    var bId = 'l-thor-' + b;
+    var providerId = providerIds[(b - 1) % 2];
+    var flete = 120000; // Flete de 120,000 COP por lote
+    var fecha = '2026-06-0' + b;
+    var name = 'Importación Lote Thor #' + b;
+    batchList.push({ id: bId, nombre: name, proveedorId: providerId, flete: flete, fecha: fecha });
+    lSheet.appendRow([bId, name, providerId, flete, fecha]);
+  }
 
   // 6. Generar Productos y Stock Iniciales Solicitados
-  var productsToInsert = [];
+  var rawProducts = [];
   
   // Accesorios (stock 40-60)
   var chargersStock = Math.floor(Math.random() * 21) + 40;
   var cablesStock = Math.floor(Math.random() * 21) + 40;
-  productsToInsert.push(['prod-char', batchId, 'Cargador', 'Cargador Rápido Tipo-C 20W', 'ninguno', '', 60000, 60000, 72000, 72000, chargersStock, 'disponible', '']);
-  productsToInsert.push(['prod-cable', batchId, 'Cable', 'Cable USB-C a Lightning 1m', 'ninguno', '', 30000, 30000, 36000, 36000, cablesStock, 'disponible', '']);
+  
+  rawProducts.push({ id: 'prod-char', loteId: 'l-thor-1', tipo: 'Cargador', modelo: 'Cargador Rápido Tipo-C 20W', tipoCodigo: 'ninguno', codigo: '', costoBase: 60000, stock: chargersStock, estado: 'disponible', foto: '' });
+  rawProducts.push({ id: 'prod-cable', loteId: 'l-thor-2', tipo: 'Cable', modelo: 'Cable USB-C a Lightning 1m', tipoCodigo: 'ninguno', codigo: '', costoBase: 30000, stock: cablesStock, estado: 'disponible', foto: '' });
 
   // Celulares (stock 5-15, precios de mercado realistas)
   var phoneList = [
@@ -258,11 +268,25 @@ function handleReset() {
   var imeiBase = 358912345000000;
   phoneList.forEach(function(p) {
     var stock = Math.floor(Math.random() * 11) + 5; // 5 a 15
-    var salePrice = Math.round(p.cost * 1.20);
     for (var s = 0; s < stock; s++) {
       var prodId = 'prod-c-' + pCounter;
       var imei = (imeiBase + pCounter).toString();
-      productsToInsert.push([prodId, batchId, 'Celular', p.name, 'imei', imei, p.cost, p.cost, salePrice, salePrice, 1, 'disponible', '']);
+      // Distribuir de forma equitativa entre los 10 lotes
+      var loteIdx = (pCounter % 10) + 1;
+      var loteId = 'l-thor-' + loteIdx;
+      
+      rawProducts.push({
+        id: prodId,
+        loteId: loteId,
+        tipo: 'Celular',
+        modelo: p.name,
+        tipoCodigo: 'imei',
+        codigo: imei,
+        costoBase: p.cost,
+        stock: 1,
+        estado: 'disponible',
+        foto: ''
+      });
       pCounter++;
     }
   });
@@ -277,19 +301,77 @@ function handleReset() {
   var mCounter = 1;
   macList.forEach(function(m) {
     var stock = Math.floor(Math.random() * 6) + 5; // 5 a 10
-    var salePrice = Math.round(m.cost * 1.20);
     for (var s = 0; s < stock; s++) {
       var prodId = 'prod-m-' + mCounter;
       var serial = 'SN-MBP-' + (10000 + mCounter);
-      productsToInsert.push([prodId, batchId, 'Laptop', m.name, 'serial', serial, m.cost, m.cost, salePrice, salePrice, 1, 'disponible', '']);
+      // Distribuir de forma equitativa entre los 10 lotes
+      var loteIdx = (mCounter % 10) + 1;
+      var loteId = 'l-thor-' + loteIdx;
+      
+      rawProducts.push({
+        id: prodId,
+        loteId: loteId,
+        tipo: 'Laptop',
+        modelo: m.name,
+        tipoCodigo: 'serial',
+        codigo: serial,
+        costoBase: m.cost,
+        stock: 1,
+        estado: 'disponible',
+        foto: ''
+      });
       mCounter++;
     }
+  });
+
+  // Calcular prorrateo de flete por lote
+  var costBaseTotals = {};
+  var itemCounts = {};
+  rawProducts.forEach(function(p) {
+    var qty = p.tipoCodigo === 'ninguno' ? p.stock : 1;
+    costBaseTotals[p.loteId] = (costBaseTotals[p.loteId] || 0) + (p.costoBase * qty);
+    itemCounts[p.loteId] = (itemCounts[p.loteId] || 0) + 1;
+  });
+
+  var productsToInsert = [];
+  rawProducts.forEach(function(p) {
+    var batch = batchList.find(function(b) { return b.id === p.loteId; });
+    var fleteTotal = batch ? batch.flete : 0;
+    var totalCostoBase = costBaseTotals[p.loteId] || 0;
+    var count = itemCounts[p.loteId] || 1;
+    
+    var fleteProrrateado = 0;
+    if (totalCostoBase > 0) {
+      fleteProrrateado = (p.costoBase / totalCostoBase) * fleteTotal;
+    } else {
+      fleteProrrateado = fleteTotal / count;
+    }
+    
+    var costoReal = p.costoBase + fleteProrrateado;
+    var precioSugerido = Math.round(costoReal * 1.20);
+    var precioVenta = precioSugerido;
+
+    productsToInsert.push([
+      p.id,
+      p.loteId,
+      p.tipo,
+      p.modelo,
+      p.tipoCodigo,
+      p.codigo,
+      p.costoBase,
+      costoReal,
+      precioSugerido,
+      precioVenta,
+      p.stock,
+      p.estado,
+      p.foto
+    ]);
   });
 
   var prodSheet = ss.getSheetByName('productos');
   prodSheet.getRange(2, 1, productsToInsert.length, SCHEMAS.productos.length).setValues(productsToInsert);
 
-  return JSONResponse({ status: 'success', message: 'Google Sheets formateado e inicializado con catálogo y stock inicial de Thor.' });
+  return JSONResponse({ status: 'success', message: 'Google Sheets formateado e inicializado con catálogo y stock inicial de Thor en 10 lotes.' });
 }
 
 // --- FUNCIONES AUXILIARES ---
