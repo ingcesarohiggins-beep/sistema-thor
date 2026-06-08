@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartControl - Sistema de Inventario y Ventas en la Nube</title>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Estilos Personalizados -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  
+  <!-- BANNER DE ESTADO DE CONEXIÓN DE GOOGLE SHEETS -->
+  <div id="connection-status-banner" style="background-color: var(--color-warning); text-align: center; padding: 10px 16px; font-size: 13px; color: #0b0f19; font-weight: 700; width: 100%; z-index: 1000; position: fixed; top: 0; left: 0; display: flex; align-items: center; justify-content: center; gap: 8px;">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <span id="connection-status-text">Operando en "Modo Demo" (LocalStorage). Conecta Google Sheets en Configuración.</span>
+  </div>
+
+  <div class="app-container" style="margin-top: 39px;">
+    
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <aside class="sidebar" id="app-sidebar" style="top: 39px;">
+      <div class="sidebar-logo">
+        <i class="fa-solid fa-mobile-screen-button"></i>
+        <h2>SmartControl</h2>
+        <button class="hamburger-menu" onclick="toggleSidebar()" style="margin-left: auto;">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      
+      <ul class="sidebar-menu">
+        <li class="menu-item active" id="menu-dashboard">
+          <a href="#" onclick="switchView('dashboard')">
+            <i class="fa-solid fa-chart-pie"></i>
+            <span>Resumen Diario</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-ventas">
+          <a href="#" onclick="switchView('ventas')">
+            <i class="fa-solid fa-cart-shopping"></i>
+            <span>Ventas</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-inventario">
+          <a href="#" onclick="switchView('inventario')">
+            <i class="fa-solid fa-boxes-stacked"></i>
+            <span>Almacén e Ingresos</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-egresos">
+          <a href="#" onclick="switchView('egresos')">
+            <i class="fa-solid fa-wallet"></i>
+            <span>Egresos Diarios</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-contactos">
+          <a href="#" onclick="switchView('contactos')">
+            <i class="fa-solid fa-users"></i>
+            <span>Clientes & Prov</span>
+          </a>
+        </li>
+        <li class="menu-item admin-only" id="menu-admin" style="display: none;">
+          <a href="#" onclick="switchView('admin')">
+            <i class="fa-solid fa-user-gear"></i>
+            <span>Administración</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- PANEL DE USUARIO -->
+      <div class="user-panel">
+        <div class="user-info">
+          <div class="user-avatar" id="current-user-avatar">A</div>
+          <div class="user-details">
+            <span class="user-name" id="current-user-name">Administrador</span>
+            <span class="user-role">
+              <span class="role-badge admin" id="current-user-role-badge"></span>
+              <span id="current-user-role-text">Admin</span>
+            </span>
+          </div>
+        </div>
+        <button class="btn-switch-role" onclick="openRoleSwitcherModal()">
+          <i class="fa-solid fa-arrows-spin"></i>
+          <span>Cambiar de Usuario</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ÁREA DE CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+      
+      <!-- ENCABEZADO SUPERIOR -->
+      <header class="top-header">
+        <button class="hamburger-menu" onclick="toggleSidebar()" id="hamburger-btn">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="page-title">
+          <h1 id="view-title">Resumen Diario</h1>
+        </div>
+        <div class="header-actions">
+          <div class="current-time-badge">
+            <i class="fa-solid fa-calendar-day"></i>
+            <span id="header-date">Cargando fecha...</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- SECCIÓN DE CONTENIDO DINÁMICO -->
+      <div class="content-wrapper">
+
+        <!-- 1. VISTA: DASHBOARD / RESUMEN DIARIO -->
+        <section class="view-pane active" id="view-dashboard">
+          <div class="card-grid">
+            <div class="glass-card metric-card">
+              <div class="metric-info">
+                <span class="metric-label">Ingresos del Día</span>
+                <span class="metric-value" id="dash-ingresos">$0</span>
+              </div>
+              <div class="metric-icon green">
+                <i class="fa-solid fa-arrow-trend-up"></i>
+              </div>
+            </div>
+            <div class="glass-card metric-card">
+              <div class="metric-info">
+                <span class="metric-label">Egresos del Día</span>
+                <span class="metric-value" id="dash-egresos">$0</span>
+              </div>
+              <div class="metric-icon red">
+                <i class="fa-solid fa-arrow-trend-down"></i>
+              </div>
+            </div>
+            <div class="glass-card metric-card">
+              <div class="metric-info">
+                <span class="metric-label" id="dash-utilidad-label">Utilidad Neta (Hoy)</span>
+                <span class="metric-value" id="dash-utilidad">$0</span>
+              </div>
+              <div class="metric-icon purple">
+                <i class="fa-solid fa-hand-holding-dollar"></i>
+              </div>
+            </div>
+            <div class="glass-card metric-card">
+              <div class="metric-info">
+                <span class="metric-label">Ventas Concretadas</span>
+                <span class="metric-value" id="dash-cant-ventas">0</span>
+              </div>
+              <div class="metric-icon amber">
+                <i class="fa-solid fa-receipt"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-layout">
+            <!-- Gráfica Semanal -->
+            <div class="glass-card chart-card">
+              <h3>📈 Flujo de Caja (Hoy)</h3>
+              <div class="chart-container" style="margin-top: 16px;">
+                <canvas id="cashflow-chart"></canvas>
+              </div>
+            </div>
+            <!-- Transacciones Recientes del Día -->
+            <div class="glass-card">
+              <h3>📋 Movimientos de Hoy</h3>
+              <div class="recent-list" id="dash-recent-list" style="margin-top: 16px;">
+                <!-- Cargado dinámicamente -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. VISTA: VENTAS -->
+        <section class="view-pane" id="view-ventas">
+          <div class="sales-layout">
+            
+            <!-- Carrito de Compras / Registro -->
+            <div class="glass-card" style="display: flex; flex-direction: column;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3>🛒 Carrito de Venta</h3>
+                <button class="btn btn-secondary btn-sm" onclick="clearCart()">
+                  <i class="fa-solid fa-trash-can"></i> Limpiar
+                </button>
+              </div>
+              
+              <!-- Buscador de Productos -->
+              <div class="search-filter-bar" style="margin-bottom: 16px;">
+                <div class="search-box">
+                  <i class="fa-solid fa-barcode"></i>
+                  <input type="text" id="sales-search-input" class="form-control" placeholder="Escribe IMEI, modelo o escanea..." oninput="searchProductForSales()">
+                </div>
+                <button class="btn btn-primary" onclick="startSalesScanner()">
+                  <i class="fa-solid fa-camera"></i> Escanear IMEI
+                </button>
+              </div>
+
+              <!-- Resultados de búsqueda rápidos -->
+              <div id="sales-search-results" style="display: none; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 16px; max-height: 200px; overflow-y: auto;">
+                <!-- Dinámico -->
+              </div>
+
+              <div class="cart-list" id="sales-cart-list">
+                <div class="cart-empty">
+                  <i class="fa-solid fa-cart-arrow-down" style="font-size: 48px; margin-bottom: 12px; display: block;"></i>
+                  El carrito está vacío. Escanea un IMEI o busca un artículo arriba.
+                </div>
+              </div>
+
+              <div class="cart-totals">
+                <div class="cart-total-row">
+                  <span class="total-label">Total a Pagar</span>
+                  <span class="total-value" id="sales-total">$0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Datos de Factura / Cierre de Venta -->
+            <div class="glass-card" style="display: flex; flex-direction: column; gap: 16px;">
+              <h3>👤 Datos de la Venta</h3>
+              
+              <!-- Selección de Cliente -->
+              <div class="form-group">
+                <label for="sales-client-select">Cliente</label>
+                <div class="input-with-action">
+                  <select id="sales-client-select">
+                    <!-- Dinámico -->
+                  </select>
+                  <button class="btn btn-secondary" onclick="openQuickClientModal()">
+                    <i class="fa-solid fa-user-plus"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Método de Pago -->
+              <div class="form-group">
+                <label for="sales-payment-method">Método de Pago</label>
+                <select id="sales-payment-method">
+                  <option value="efectivo">Efectivo</option>
+                  <option value="transferencia">Transferencia Bancaria</option>
+                </select>
+              </div>
+
+              <!-- Botón Confirmar -->
+              <button class="btn btn-success" style="width: 100%; margin-top: auto; padding: 14px;" onclick="processSale()">
+                <i class="fa-solid fa-file-pdf"></i> Confirmar Venta e Imprimir PDF
+              </button>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 3. VISTA: INVENTARIO (ALMACÉN Y LOTES) -->
+        <section class="view-pane" id="view-inventario">
+          
+          <!-- PANEL EXCLUSIVO ADMIN: ALMACÉN VALORIZADO -->
+          <div class="card-grid admin-only" id="inventory-valuation-cards" style="display: none; margin-bottom: 24px;">
+            <div class="glass-card metric-card" style="background: rgba(124, 58, 237, 0.12);">
+              <div class="metric-info">
+                <span class="metric-label" style="color: var(--text-main); font-size: 11px;">Inversión Total en Almacén</span>
+                <span class="metric-value" id="val-costo" style="font-size: 24px;">$0</span>
+              </div>
+              <div class="metric-icon purple"><i class="fa-solid fa-vault"></i></div>
+            </div>
+            <div class="glass-card metric-card" style="background: rgba(16, 185, 129, 0.12);">
+              <div class="metric-info">
+                <span class="metric-label" style="color: var(--text-main); font-size: 11px;">Valor de Venta Estimado</span>
+                <span class="metric-value" id="val-venta" style="font-size: 24px;">$0</span>
+              </div>
+              <div class="metric-icon green"><i class="fa-solid fa-tags"></i></div>
+            </div>
+            <div class="glass-card metric-card" style="background: rgba(14, 165, 233, 0.12);">
+              <div class="metric-info">
+                <span class="metric-label" style="color: var(--text-main); font-size: 11px;">Utilidad Proyectada</span>
+                <span class="metric-value" id="val-utilidad" style="font-size: 24px;">$0</span>
+              </div>
+              <div class="metric-icon"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h3>📦 Control de Almacén</h3>
+              <p style="font-size: 13px; color: var(--text-muted);">Gestiona los lotes de importación y el inventario desglosado.</p>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-primary" onclick="openNewBatchModal()">
+                <i class="fa-solid fa-circle-plus"></i> Registrar Nuevo Lote
+              </button>
+              <button class="btn btn-secondary" onclick="openNewProductModal(false)">
+                <i class="fa-solid fa-mobile-screen"></i> Ingreso de Celular/Artículo
+              </button>
+              <button class="btn btn-secondary" onclick="exportDatabaseToFile()">
+                <i class="fa-solid fa-download"></i> Respaldar (JSON)
+              </button>
+              <button class="btn btn-secondary" onclick="triggerImportFileInput()">
+                <i class="fa-solid fa-upload"></i> Restaurar
+              </button>
+              <input type="file" id="import-file-input" style="display: none;" onchange="importDatabaseFromFile(event)">
+            </div>
+          </div>
+
+          <!-- Barra de Búsqueda y Filtros de Almacén -->
+          <div class="search-filter-bar">
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="inventory-search" class="form-control" placeholder="Buscar por modelo, IMEI, lote o serial..." oninput="renderInventory()">
+            </div>
+            <select id="filter-type" class="filter-select" onchange="renderInventory()">
+              <option value="">Todos los Tipos</option>
+              <option value="Celular">Celulares</option>
+              <option value="Laptop">Laptops</option>
+              <option value="Cargador">Cargadores</option>
+              <option value="Cable">Cables</option>
+              <option value="Otro">Otros</option>
+            </select>
+            <select id="filter-status" class="filter-select" onchange="renderInventory()">
+              <option value="">Todos los Estados</option>
+              <option value="disponible">Disponible</option>
+              <option value="vendido">Vendido</option>
+              <option value="baja">De Baja (Dañados)</option>
+              <option value="reemplazado">Reemplazados (Garantía)</option>
+            </select>
+            <select id="filter-batch" class="filter-select" onchange="renderInventory()">
+              <!-- Dinámico -->
+            </select>
+          </div>
+
+          <!-- Pestañas internas: Inventario Desglosado vs Lotes -->
+          <div class="glass-card">
+            <div style="display: flex; gap: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+              <button class="btn btn-secondary btn-sm" id="btn-tab-prod" onclick="switchInventoryTab('productos')">Productos Desglosados</button>
+              <button class="btn btn-secondary btn-sm" id="btn-tab-lotes" onclick="switchInventoryTab('lotes')">Historial de Lotes</button>
+            </div>
+
+            <!-- Tabla de Productos -->
+            <div class="table-container" id="tab-inventory-products">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Foto</th>
+                    <th>Tipo</th>
+                    <th>Modelo / Nombre</th>
+                    <th>Lote Origen</th>
+                    <th>IMEI / Código / Serial</th>
+                    <th>Costo Base</th>
+                    <th>Flete Prorrateado</th>
+                    <th>Costo Real</th>
+                    <th>Precio Sugerido (+20%)</th>
+                    <th>Precio Venta</th>
+                    <th>Stock / Estado</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="inventory-table-body">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Tabla de Lotes -->
+            <div class="table-container" id="tab-inventory-lotes" style="display: none;">
+              <table class="custom-table">
+                <thead>
+                  <tr>
+                    <th>Nombre Lote</th>
+                    <th>Proveedor</th>
+                    <th>Flete Total</th>
+                    <th>Costo Total Lote</th>
+                    <th>Fecha Ingreso</th>
+                    <th>Items Registrados</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="lotes-table-body">
+                  <!-- Dinámico -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. VISTA: EGRESOS -->
+        <section class="view-pane" id="view-egresos">
+          <div class="sales-layout">
+            <!-- Formulario de Egreso -->
+            <div class="glass-card">
+              <h3>💸 Registrar Egreso Diario</h3>
+              <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Registra salidas de dinero menores o gastos del negocio hoy.</p>
+              
+              <form id="form-egreso" onsubmit="saveEgresoForm(event)">
+                <div class="form-group">
+                  <label for="egreso-desc">Descripción del Gasto</label>
+                  <input type="text" id="egreso-desc" class="form-control" placeholder="Ej. Almuerzo, Transporte de encomienda, Bombillo" required>
+                </div>
+                <div class="form-group">
+                  <label for="egreso-monto">Monto ($)</label>
+                  <input type="number" id="egreso-monto" class="form-control" placeholder="Monto total pagado" required>
+                </div>
+                <button type="submit" class="btn btn-danger" style="width: 100%; margin-top: 12px;">
+                  <i class="fa-solid fa-circle-minus"></i> Registrar Gasto
+                </button>
+              </form>
+            </div>
+
+            <!-- Historial de Egresos de la Semana -->
+            <div class="glass-card">
+              <h3>📋 Historial Reciente de Egresos</h3>
+              <div class="table-container" style="max-height: 350px; overflow-y: auto;">
+                <table class="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Descripción</th>
+                      <th>Monto</th>
+                      <th>Fecha</th>
+                      <th>Registrado por</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="egresos-table-body">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. VISTA: CLIENTES & PROVEEDORES -->
+        <section class="view-pane" id="view-contactos">
+          <div class="dashboard-layout">
+            
+            <!-- Columna Izquierda: Clientes -->
+            <div class="glass-card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3>👥 Clientes</h3>
+                <button class="btn btn-primary btn-sm" onclick="openNewClientModal()">
+                  <i class="fa-solid fa-plus"></i> Agregar Cliente
+                </button>
+              </div>
+              <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                <table class="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Documento</th>
+                      <th>Teléfono</th>
+                    </tr>
+                  </thead>
+                  <tbody id="clients-table-body">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Columna Derecha: Proveedores -->
+            <div class="glass-card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3>🏢 Proveedores</h3>
+                <button class="btn btn-primary btn-sm" onclick="openNewProviderModal()">
+                  <i class="fa-solid fa-plus"></i> Agregar Proveedor
+                </button>
+              </div>
+              <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                <table class="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Proveedor</th>
+                      <th>Teléfono</th>
+                      <th>Email</th>
+                    </tr>
+                  </thead>
+                  <tbody id="providers-table-body">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 6. VISTA: ADMINISTRACIÓN -->
+        <section class="view-pane" id="view-admin">
+          <div class="dashboard-layout">
+            <!-- Vendedores -->
+            <div class="glass-card">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3>👥 Gestión de Vendedores</h3>
+                <button class="btn btn-primary btn-sm" onclick="openNewSellerModal()">
+                  <i class="fa-solid fa-user-plus"></i> Nuevo Vendedor
+                </button>
+              </div>
+              <div class="table-container">
+                <table class="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Usuario</th>
+                      <th>Rol</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sellers-table-body">
+                    <!-- Dinámico -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Ajustes de Sistema y Nube -->
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+              
+              <!-- CONEXIÓN DE GOOGLE SHEETS -->
+              <div class="glass-card" style="display: flex; flex-direction: column; gap: 16px;">
+                <h3>🔌 Configuración de Google Sheets</h3>
+                <p style="font-size: 13px; color: var(--text-muted);">Conecta la base de datos de la nube pegando la URL de tu implementación de Google Apps Script.</p>
+                <div class="form-group">
+                  <label for="sheets-url-input">URL del Apps Script (Web App)</label>
+                  <input type="text" id="sheets-url-input" class="form-control" placeholder="https://script.google.com/macros/s/.../exec">
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-primary btn-sm" onclick="saveSheetsConfiguration()">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Conectar y Guardar
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="testSheetsConnection()">
+                    <i class="fa-solid fa-arrows-spin"></i> Probar Conexión
+                  </button>
+                </div>
+              </div>
+
+              <!-- Ajustes Generales -->
+              <div class="glass-card" style="display: flex; flex-direction: column; gap: 16px;">
+                <h3>⚙️ Configuración del Negocio</h3>
+                <p style="font-size: 13px; color: var(--text-muted);">Parámetros globales del panel y restablecimiento.</p>
+                
+                <div class="form-group">
+                  <label>Restablecer Base de Datos</label>
+                  <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">Esto borrará todo el inventario, ventas y egresos, y cargará la configuración inicial en la base de datos activa (local o Sheets).</p>
+                  <button class="btn btn-danger btn-sm" onclick="resetDatabaseToDefault()">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Formatear y Cargar Mocks
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== MODALES ==================== -->
+
+  <!-- MODAL 1: SWITCHER DE ROL (Iniciar sesión/Cambiar usuario) -->
+  <div class="modal-backdrop" id="modal-role-switcher">
+    <div class="modal-card" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>🔐 Acceso de Usuario</h3>
+        <button class="btn-close" onclick="closeModal('modal-role-switcher')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="role-select-user">Selecciona tu Usuario</label>
+          <select id="role-select-user" onchange="onUserSelectedInSwitcher()">
+            <!-- Dinámico -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="role-input-password">Contraseña</label>
+          <input type="password" id="role-input-password" class="form-control" placeholder="Ingresa contraseña">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-role-switcher')">Cancelar</button>
+        <button class="btn btn-primary" onclick="confirmRoleSwitch()">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: NUEVO LOTE -->
+  <div class="modal-backdrop" id="modal-lote">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📦 Registrar Nuevo Lote</h3>
+        <button class="btn-close" onclick="closeModal('modal-lote')">&times;</button>
+      </div>
+      <form id="form-lote" onsubmit="saveLoteForm(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="lote-nombre">Nombre Identificador del Lote</label>
+            <input type="text" id="lote-nombre" class="form-control" placeholder="Ej. Lote Celulares Junio 2026 - Prov Express" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="lote-proveedor">Proveedor</label>
+              <select id="lote-proveedor" required>
+                <!-- Dinámico -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="lote-flete">Costo del Flete ($)</label>
+              <input type="number" id="lote-flete" class="form-control" placeholder="Flete del lote completo" required min="0">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-lote')">Cancelar</button>
+          <button type="submit" class="btn btn-success">Guardar Lote</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 3: NUEVO PRODUCTO / EDITAR PRODUCTO -->
+  <div class="modal-backdrop" id="modal-producto">
+    <div class="modal-card" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3 id="modal-producto-title">Ingreso de Producto</h3>
+        <button class="btn-close" onclick="closeModal('modal-producto')">&times;</button>
+      </div>
+      <form id="form-producto" onsubmit="saveProductoForm(event)">
+        <input type="hidden" id="prod-id">
+        <div class="modal-body">
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="prod-lote">Lote Asignado</label>
+              <select id="prod-lote" required>
+                <!-- Dinámico -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="prod-tipo">Tipo de Artículo</label>
+              <select id="prod-tipo" onchange="onProductTypeChanged()" required>
+                <option value="Celular">Celular</option>
+                <option value="Laptop">Laptop</option>
+                <option value="Cargador">Cargador</option>
+                <option value="Cable">Cable</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="prod-modelo">Marca / Modelo / Descripción</label>
+            <input type="text" id="prod-modelo" class="form-control" placeholder="Ej. Samsung S24 256GB / Cargador OEM 20W" required>
+          </div>
+
+          <!-- Selector de Código (Requisito Especial) -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="prod-tipo-codigo">Tipo de Identificador</label>
+              <select id="prod-tipo-codigo" onchange="onTypeCodeChanged()" required>
+                <option value="imei">Con IMEI (Único)</option>
+                <option value="serial">Con Otro Código (Serial/Lote)</option>
+                <option value="ninguno">Sin Código (Venta por cantidad)</option>
+              </select>
+            </div>
+            <div class="form-group" id="prod-codigo-wrapper">
+              <label for="prod-codigo" id="prod-codigo-label">IMEI (15 dígitos)</label>
+              <div class="input-with-action">
+                <input type="text" id="prod-codigo" class="form-control" placeholder="Escribe o escanea con cámara">
+                <button type="button" class="btn btn-primary" id="btn-scan-prod-code" onclick="startProductScanner()">
+                  <i class="fa-solid fa-camera"></i>
+                </button>
+              </div>
+            </div>
+            <div class="form-group" id="prod-stock-wrapper" style="display: none;">
+              <label for="prod-stock">Cantidad en Stock Inicial</label>
+              <input type="number" id="prod-stock" class="form-control" value="1" min="1">
+            </div>
+          </div>
+
+          <!-- Precios y Costos -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="prod-costo-base">Costo de Compra Base ($)</label>
+              <input type="number" id="prod-costo-base" class="form-control" placeholder="Costo sin flete" oninput="calculateSuggestedPriceFromForm()" required min="0">
+            </div>
+            <div class="form-group">
+              <label>Flete Prorrateado (Auto)</label>
+              <input type="text" id="prod-flete-prorrateado" class="form-control" disabled value="$0">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Precio Sugerido (+20% Utilidad)</label>
+              <input type="text" id="prod-precio-sugerido" class="form-control" disabled value="$0">
+            </div>
+            <div class="form-group">
+              <label for="prod-precio-venta">Precio de Venta Final ($)</label>
+              <input type="number" id="prod-precio-venta" class="form-control" placeholder="Define el precio final" required min="0">
+            </div>
+          </div>
+
+          <!-- Foto del producto -->
+          <div class="form-group">
+            <label>Foto del Producto</label>
+            <div class="product-photo-preview" id="photo-preview-box">
+              <div class="product-photo-placeholder" id="photo-placeholder">
+                <i class="fa-solid fa-image"></i>
+                <span>Arrastra o selecciona un archivo (o toma foto)</span>
+              </div>
+              <img id="photo-preview-img" style="display: none;" src="">
+            </div>
+            <input type="file" id="prod-photo-input" class="photo-input-hidden" accept="image/*" onchange="handlePhotoUpload(event)">
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="triggerPhotoInput()">
+                <i class="fa-solid fa-file-image"></i> Subir Foto
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="startCameraForPhoto()">
+                <i class="fa-solid fa-camera"></i> Usar Cámara
+              </button>
+            </div>
+            <video id="camera-stream" style="display: none; width: 100%; height: 180px; object-fit: cover; border-radius: 8px; margin-top: 8px;"></video>
+            <canvas id="camera-canvas" style="display: none;"></canvas>
+            <button type="button" id="btn-capture-photo" class="btn btn-success btn-sm" style="display: none; margin-top: 8px; width: 100%;">
+              <i class="fa-solid fa-circle"></i> Capturar Foto
+            </button>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-producto')">Cancelar</button>
+          <button type="submit" class="btn btn-success" id="btn-save-product">Guardar Producto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 4: AGREGAR CLIENTE -->
+  <div class="modal-backdrop" id="modal-cliente">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>👤 Registrar Nuevo Cliente</h3>
+        <button class="btn-close" onclick="closeModal('modal-cliente')">&times;</button>
+      </div>
+      <form id="form-cliente" onsubmit="saveClienteForm(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="cli-nombre">Nombre Completo</label>
+            <input type="text" id="cli-nombre" class="form-control" placeholder="Ej. Juan Pérez" required>
+          </div>
+          <div class="form-group">
+            <label for="cli-doc">Cédula o Documento de Identidad</label>
+            <input type="text" id="cli-doc" class="form-control" placeholder="Ej. 1023456789" required>
+          </div>
+          <div class="form-group">
+            <label for="cli-tel">Teléfono de Contacto</label>
+            <input type="text" id="cli-tel" class="form-control" placeholder="Ej. +57 312 999 8888" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-cliente')">Cancelar</button>
+          <button type="submit" class="btn btn-success">Guardar Cliente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 5: AGREGAR PROVEEDOR -->
+  <div class="modal-backdrop" id="modal-proveedor">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🏢 Registrar Nuevo Proveedor</h3>
+        <button class="btn-close" onclick="closeModal('modal-proveedor')">&times;</button>
+      </div>
+      <form id="form-proveedor" onsubmit="saveProveedorForm(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="prov-nombre">Nombre o Razón Social</label>
+            <input type="text" id="prov-nombre" class="form-control" placeholder="Ej. Importadora Miami Express" required>
+          </div>
+          <div class="form-group">
+            <label for="prov-tel">Teléfono Comercial</label>
+            <input type="text" id="prov-tel" class="form-control" placeholder="Ej. +1 305 555 0199" required>
+          </div>
+          <div class="form-group">
+            <label for="prov-email">Correo Electrónico (Opcional)</label>
+            <input type="email" id="prov-email" class="form-control" placeholder="Ej. contacto@proveedor.com">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-proveedor')">Cancelar</button>
+          <button type="submit" class="btn btn-success">Guardar Proveedor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 6: AGREGAR/EDITAR VENDEDOR (ADMIN ONLY) -->
+  <div class="modal-backdrop" id="modal-vendedor">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-vendedor-title">Registrar Nuevo Vendedor</h3>
+        <button class="btn-close" onclick="closeModal('modal-vendedor')">&times;</button>
+      </div>
+      <form id="form-vendedor" onsubmit="saveSellerForm(event)">
+        <input type="hidden" id="vend-id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="vend-nombre">Nombre Completo</label>
+            <input type="text" id="vend-nombre" class="form-control" placeholder="Ej. Carlos Mendoza" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="vend-user">Usuario de Acceso</label>
+              <input type="text" id="vend-user" class="form-control" placeholder="Ej. carlosm" required>
+            </div>
+            <div class="form-group">
+              <label for="vend-pass">Contraseña</label>
+              <input type="password" id="vend-pass" class="form-control" placeholder="Establece contraseña" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="vend-rol">Rol en el Sistema</label>
+            <select id="vend-rol" required>
+              <option value="vendedor">Vendedor (Acceso Limitado)</option>
+              <option value="admin">Administrador (Acceso Total)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-vendedor')">Cancelar</button>
+          <button type="submit" class="btn btn-success">Guardar Vendedor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 7: HISTORIAL IMEI / CICLO DE VIDA (Requisito Especial) -->
+  <div class="modal-backdrop" id="modal-ciclo-vida">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🔍 Historial y Ciclo de Vida del IMEI</h3>
+        <button class="btn-close" onclick="closeModal('modal-ciclo-vida')">&times;</button>
+      </div>
+      <div class="modal-body" id="ciclo-vida-body">
+        <!-- Dinámico -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-ciclo-vida')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 8: ACTA DE BAJA BUROCRÁTICA (Requisito Especial con Fotos) -->
+  <div class="modal-backdrop" id="modal-baja">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>🚨 Acta de Baja de Producto</h3>
+        <button class="btn-close" onclick="closeModal('modal-baja')">&times;</button>
+      </div>
+      <form id="form-baja" onsubmit="submitProductBaja(event)">
+        <input type="hidden" id="baja-prod-id">
+        <div class="modal-body">
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+            El producto se retirará de la venta y se registrará un egreso por pérdida equivalente al costo real de adquisición.
+          </p>
+          
+          <div class="form-group">
+            <label for="baja-motivo">Motivo del Descarte</label>
+            <select id="baja-motivo" required>
+              <option value="Defecto de fábrica (Garantía Proveedor)">Defecto de fábrica (Garantía Proveedor)</option>
+              <option value="Daño físico en tienda">Daño físico en tienda</option>
+              <option value="Robo o Pérdida">Robo o Pérdida</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="baja-justificacion">Justificación Detallada (Obligatoria)</label>
+            <textarea id="baja-justificacion" class="form-control" rows="3" placeholder="Explica detalladamente qué ocurrió..." required></textarea>
+          </div>
+
+          <!-- Captura de foto de evidencia -->
+          <div class="form-group">
+            <label>Foto de Evidencia (Obligatoria para auditoría)</label>
+            <div class="product-photo-preview" id="baja-photo-preview-box">
+              <div class="product-photo-placeholder" id="baja-photo-placeholder">
+                <i class="fa-solid fa-camera"></i>
+                <span>Toma o selecciona foto de evidencia</span>
+              </div>
+              <img id="baja-photo-preview-img" style="display: none; width:100%; height:100%; object-fit:cover;">
+            </div>
+            <input type="file" id="baja-photo-input" style="display:none;" accept="image/*" onchange="handleBajaPhotoUpload(event)">
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('baja-photo-input').click()">
+                <i class="fa-solid fa-file-image"></i> Archivo
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="startCameraForBajaPhoto()">
+                <i class="fa-solid fa-camera"></i> Cámara
+              </button>
+            </div>
+            
+            <video id="baja-camera-stream" style="display: none; width: 100%; height: 180px; object-fit: cover; border-radius: 8px; margin-top: 8px;"></video>
+            <canvas id="baja-camera-canvas" style="display: none;"></canvas>
+            <button type="button" id="baja-btn-capture-photo" class="btn btn-success btn-sm" style="display: none; margin-top: 8px; width: 100%;">
+              <i class="fa-solid fa-circle"></i> Capturar Evidencia
+            </button>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-baja')">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Confirmar Acta de Baja</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 9: RECIBIR REEMPLAZO DE GARANTÍA -->
+  <div class="modal-backdrop" id="modal-reemplazo">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>🔁 Registrar Reemplazo del Proveedor</h3>
+        <button class="btn-close" onclick="closeModal('modal-reemplazo')">&times;</button>
+      </div>
+      <form id="form-reemplazo" onsubmit="submitProductReemplazo(event)">
+        <input type="hidden" id="reemplazo-prod-id">
+        <div class="modal-body">
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+            Ingresa el nuevo equipo entregado por el proveedor. Esto revertirá la pérdida financiera registrada previamente.
+          </p>
+
+          <div class="form-group">
+            <label for="reemplazo-imei">Nuevo IMEI / Código / Serial</label>
+            <div class="input-with-action">
+              <input type="text" id="reemplazo-imei" class="form-control" placeholder="Escribe o escanea nuevo IMEI" required>
+              <button type="button" class="btn btn-primary" onclick="startReemplazoScanner()">
+                <i class="fa-solid fa-camera"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="reemplazo-observaciones">Observaciones / Detalles del Cambio</label>
+            <textarea id="reemplazo-observaciones" class="form-control" rows="2" placeholder="Notas adicionales sobre la entrega..."></textarea>
+          </div>
+
+          <!-- Captura de foto del nuevo equipo -->
+          <div class="form-group">
+            <label>Foto del Nuevo Producto (Opcional - Hereda la anterior si está vacía)</label>
+            <div class="product-photo-preview" id="reem-photo-preview-box">
+              <div class="product-photo-placeholder" id="reem-photo-placeholder">
+                <i class="fa-solid fa-image"></i>
+                <span>Toma o selecciona foto del nuevo equipo</span>
+              </div>
+              <img id="reem-photo-preview-img" style="display: none; width:100%; height:100%; object-fit:cover;">
+            </div>
+            <input type="file" id="reem-photo-input" style="display:none;" accept="image/*" onchange="handleReemplazoPhotoUpload(event)">
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('reem-photo-input').click()">
+                <i class="fa-solid fa-file-image"></i> Archivo
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="startCameraForReemplazoPhoto()">
+                <i class="fa-solid fa-camera"></i> Cámara
+              </button>
+            </div>
+            
+            <video id="reem-camera-stream" style="display: none; width: 100%; height: 180px; object-fit: cover; border-radius: 8px; margin-top: 8px;"></video>
+            <canvas id="reem-camera-canvas" style="display: none;"></canvas>
+            <button type="button" id="reem-btn-capture-photo" class="btn btn-success btn-sm" style="display: none; margin-top: 8px; width: 100%;">
+              <i class="fa-solid fa-circle"></i> Capturar Equipo
+            </button>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-reemplazo')">Cancelar</button>
+          <button type="submit" class="btn btn-success">Recibir e Ingresar Stock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== DEPENDENCIAS Y SCRIPTS ==================== -->
+  
+  <!-- html5-qrcode para cámara -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- jsPDF para los recibos en PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Chart.js para resúmenes gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Lógica de Negocio y Sistema -->
+  <script src="js/db.js"></script>
+  <script src="js/scanner.js"></script>
+  <script src="js/pdf-gen.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
