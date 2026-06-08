@@ -16,32 +16,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar DB (Carga local u obtiene Sheets si está guardado)
   await DB.init();
 
-  // Cargar sesión anterior o usar Admin por defecto
-  const lastUserId = localStorage.getItem('cel_active_user_id') || 'v-1';
-  const sellers = DB.getVendedores();
-  
-  // COMPROBACIÓN DEFENSIVA: Evitar que el JS colapse si la DB carga vacía
-  if (sellers.length === 0) {
-    currentUser = { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' };
-  } else {
-    currentUser = sellers.find(s => s.id === lastUserId) || sellers[0];
-  }
-  
-  // Actualizar UI del usuario y conexión
-  updateUserUI();
+  // Actualizar UI del estado de conexión de Google Sheets
   updateConnectionStatusUI();
   updateCurrentDate();
   
-  // Registrar vistas iniciales
-  switchView('dashboard');
-
-  // Inicializar selectores dinámicos
-  populateSelectors();
-
   // Cargar URL en el input de configuración si existe
   if (DB.apiURL) {
     document.getElementById('sheets-url-input').value = DB.apiURL;
   }
+
+  // Verificar si hay sesión activa guardada
+  const activeUserId = localStorage.getItem('cel_active_user_id');
+  const sellers = DB.getVendedores();
+  
+  if (activeUserId && sellers.length > 0) {
+    const matched = sellers.find(s => s.id === activeUserId);
+    if (matched) {
+      currentUser = matched;
+      updateUserUI();
+      // Inicializar selectores dinámicos
+      populateSelectors();
+      // Ocultar pantalla de login y mostrar dashboard
+      document.getElementById('login-screen').style.display = 'none';
+      switchView('dashboard');
+      return;
+    }
+  }
+
+  // Si no hay sesión activa, mostrar pantalla de login
+  showLoginScreen();
 });
 
 // --- GESTIÓN DE BANNER DE CONEXIÓN DE GOOGLE SHEETS ---
@@ -164,37 +167,52 @@ function updateUserUI() {
   }
 }
 
-function openRoleSwitcherModal() {
-  const sellers = DB.getVendedores();
-  const select = document.getElementById('role-select-user');
+function showLoginScreen() {
+  currentUser = null;
+  localStorage.removeItem('cel_active_user_id');
   
+  // Mostrar pantalla de login y limpiar inputs
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+}
+
+function handleLoginSubmit(event) {
+  event.preventDefault();
+  const usernameInput = document.getElementById('login-username').value.trim();
+  const passwordInput = document.getElementById('login-password').value;
+
+  const sellers = DB.getVendedores();
+  let target = null;
+
   if (sellers.length === 0) {
-    select.innerHTML = '<option value="">Cargando usuarios...</option>';
+    // Fallback defensivo por si es la primera inicialización y la DB está limpia
+    if (usernameInput === 'admin@thor.com' && passwordInput === 'thor1996') {
+      target = { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' };
+    }
   } else {
-    select.innerHTML = sellers.map(s => `<option value="${s.id}">${s.usuario} (${s.rol === 'admin' ? 'Admin' : 'Vendedor'})</option>`).join('');
+    target = sellers.find(s => s.usuario === usernameInput);
   }
-  
-  document.getElementById('role-input-password').value = '';
-  openModal('modal-role-switcher');
-}
 
-function onUserSelectedInSwitcher() {
-  document.getElementById('role-input-password').value = '';
-}
-
-function confirmRoleSwitch() {
-  const sellerId = document.getElementById('role-select-user').value;
-  const passwordInput = document.getElementById('role-input-password').value;
-  
-  const sellers = DB.getVendedores();
-  const target = sellers.find(s => s.id === sellerId);
-  
   if (target && target.contrasena === passwordInput) {
     currentUser = target;
+    localStorage.setItem('cel_active_user_id', currentUser.id);
     updateUserUI();
-    closeModal('modal-role-switcher');
+    
+    // Inicializar selectores dinámicos
+    populateSelectors();
+    
+    // Ocultar pantalla de login y mostrar dashboard
+    document.getElementById('login-screen').style.display = 'none';
+    switchView('dashboard');
   } else {
-    alert("Contraseña incorrecta. Por favor intente nuevamente.");
+    alert("Usuario o contraseña incorrectos. Por favor verifique sus datos.");
+  }
+}
+
+function handleLogout() {
+  if (confirm("¿Está seguro que desea cerrar la sesión?")) {
+    showLoginScreen();
   }
 }
 
