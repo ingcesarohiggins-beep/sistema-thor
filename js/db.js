@@ -28,11 +28,14 @@ const DB = {
       localStorage.removeItem('demo_modelos');
     }
 
-    this.apiURL = localStorage.getItem('cel_google_sheet_url') || defaultUrl;
-    
-    // Si no está guardado aún en localStorage, lo guardamos para consistencia
-    if (!localStorage.getItem('cel_google_sheet_url')) {
+    // Forzar la última URL provista para evitar conflictos con URLs antiguas en caché de LocalStorage
+    const storedUrl = localStorage.getItem('cel_google_sheet_url');
+    if (storedUrl !== defaultUrl) {
+      console.log("Actualizando URL de base de datos a la última versión configurada...");
       localStorage.setItem('cel_google_sheet_url', defaultUrl);
+      this.apiURL = defaultUrl;
+    } else {
+      this.apiURL = storedUrl || defaultUrl;
     }
     
     if (this.apiURL) {
