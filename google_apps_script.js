@@ -5,14 +5,10 @@
  * 1. Abre tu Hoja de Cálculo en Google Sheets.
  * 2. Ve a Extensiones > Apps Script.
  * 3. Borra el código actual, pega este código actualizado.
- * 4. Haz clic en "Guardar" (icono de disquete).
- * 5. Haz clic en "Implementar" > "Administrar implementaciones".
- * 6. Selecciona tu implementación actual (Aplicación web), haz clic en el lápiz (Editar).
- * 7. En "Versión", selecciona "Nueva versión".
- * 8. Haz clic en "Implementar" (¡muy importante para que los cambios se activen!).
+ * 4. Guardar.
+ * 5. Implementar > Administrar implementaciones > Editar > Nueva versión > Implementar.
  */
 
-// Pestañas por defecto y sus encabezados de columnas (Se añadió 'modelos')
 const SCHEMAS = {
   vendedores: ['id', 'nombre', 'usuario', 'contrasena', 'rol'],
   proveedores: ['id', 'nombre', 'telefono', 'email'],
@@ -21,7 +17,7 @@ const SCHEMAS = {
   productos: ['id', 'loteId', 'tipo', 'modelo', 'tipoCodigo', 'codigo', 'costoBase', 'costoReal', 'precioSugerido', 'precioVenta', 'stock', 'estado', 'foto'],
   ventas: ['id', 'clienteId', 'vendedorId', 'fecha', 'total', 'articulos', 'metodoPago'],
   egresos: ['id', 'descripcion', 'monto', 'fecha', 'vendedorId'],
-  modelos: ['id', 'marca', 'modelo', 'tipo'] // Catálogo de Modelos sugerido
+  modelos: ['id', 'marca', 'modelo', 'tipo']
 };
 
 function doGet(e) {
@@ -139,7 +135,7 @@ function handleDelete(sheetName, id) {
   return JSONResponse({ status: 'error', message: 'No se encontró el ID a eliminar' });
 }
 
-// Resetear y cargar credenciales personalizadas de usuarios
+// Resetear y cargar credenciales personalizadas de usuarios más stock inicial
 function handleReset() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
@@ -160,7 +156,7 @@ function handleReset() {
   var temp = ss.getSheetByName('temp_clean');
   if (temp) ss.deleteSheet(temp);
 
-  // 1. Cargar Usuarios Predeterminados Solicitados
+  // 1. Cargar Usuarios
   var defaultSellers = [
     ['v-1', 'Administrador Thor', 'admin@thor.com', 'thor1996', 'admin'],
     ['v-2', 'Vendedor Uno', 'vendedor1@thor.com', 'ventasthor1', 'vendedor'],
@@ -169,7 +165,7 @@ function handleReset() {
   var sSheet = ss.getSheetByName('vendedores');
   sSheet.getRange(2, 1, defaultSellers.length, 5).setValues(defaultSellers);
 
-  // 2. Cargar Proveedores Mock
+  // 2. Cargar Proveedores
   var defaultProviders = [
     ['p-1', 'Celular Express Mayorista', '+57 312 4567890', 'ventas@celularexpress.com'],
     ['p-2', 'Accesorios & Cargas SAS', '+57 300 9876543', 'contacto@accesorioscargas.com']
@@ -177,7 +173,7 @@ function handleReset() {
   var pSheet = ss.getSheetByName('proveedores');
   pSheet.getRange(2, 1, defaultProviders.length, 4).setValues(defaultProviders);
 
-  // 3. Cargar Clientes Mock
+  // 3. Cargar Clientes
   var defaultClients = [
     ['c-general', 'Cliente General (Venta Rápida)', '99999999', '00000000'],
     ['c-1', 'María Camila Ortega', '1098765432', '+57 315 2223344']
@@ -185,19 +181,115 @@ function handleReset() {
   var cSheet = ss.getSheetByName('clientes');
   cSheet.getRange(2, 1, defaultClients.length, 4).setValues(defaultClients);
 
-  // 4. Cargar Catálogo Inicial de Modelos de Prueba
+  // 4. Catálogo de Modelos (Celulares según imagen, macbook y accesorios)
   var defaultModels = [
-    ['m-1', 'Samsung', 'Samsung Galaxy S23 Ultra', 'Celular'],
-    ['m-2', 'Xiaomi', 'Xiaomi Redmi Note 13 Pro', 'Celular'],
-    ['m-3', 'Apple', 'iPhone 15 Pro Max', 'Celular'],
-    ['m-4', 'Lenovo', 'Laptop Lenovo ThinkPad L14', 'Laptop'],
-    ['m-5', 'Genérico', 'Cargador Rápido Tipo-C 25W', 'Cargador'],
-    ['m-6', 'Genérico', 'Cable Trenzado Tipo-C a C 2m', 'Cable']
+    ['m-1', 'Apple', 'iPhone 11 R 64GB', 'Celular'],
+    ['m-2', 'Apple', 'iPhone 13 R 128GB', 'Celular'],
+    ['m-3', 'Apple', 'iPhone 14 eSIM 128GB', 'Celular'],
+    ['m-4', 'Apple', 'iPhone 14 Chip 128GB', 'Celular'],
+    ['m-5', 'Apple', 'iPhone 15 128GB', 'Celular'],
+    ['m-6', 'Apple', 'iPhone 15 Pro Max eSIM 256GB', 'Celular'],
+    ['m-7', 'Apple', 'iPhone 16 Chip 128GB', 'Celular'],
+    ['m-8', 'Apple', 'iPhone 16 Chip 256GB', 'Celular'],
+    ['m-9', 'Apple', 'iPhone 16 Plus 128GB', 'Celular'],
+    ['m-10', 'Apple', 'iPhone 16 Pro Chip 128GB', 'Celular'],
+    ['m-11', 'Apple', 'iPhone 16 Pro Max Chip 256GB', 'Celular'],
+    ['m-12', 'Apple', 'iPhone 17 Chip 256GB', 'Celular'],
+    ['m-13', 'Apple', 'iPhone 17 eSIM 256GB', 'Celular'],
+    ['m-14', 'Apple', 'iPhone 17 Pro eSIM 256GB', 'Celular'],
+    ['m-15', 'Apple', 'iPhone 17 Pro Chip 256GB', 'Celular'],
+    ['m-16', 'Apple', 'iPhone 17 Pro eSIM 512GB', 'Celular'],
+    ['m-17', 'Apple', 'iPhone 17 Pro Chip 1TB', 'Celular'],
+    ['m-18', 'Apple', 'iPhone 17 Pro Max eSIM 256GB', 'Celular'],
+    ['m-19', 'Apple', 'iPhone 17 Pro Max Chip 256GB', 'Celular'],
+    ['m-20', 'Apple', 'iPhone 17 Pro Max eSIM 512GB', 'Celular'],
+    ['m-21', 'Apple', 'iPhone 17 Pro Max Chip 512GB', 'Celular'],
+    ['m-22', 'Apple', 'iPhone 17 Pro Max eSIM 1TB', 'Celular'],
+    ['m-23', 'Apple', 'MacBook Pro 14" M3 (8GB/512GB)', 'Laptop'],
+    ['m-24', 'Apple', 'MacBook Pro 14" M3 Pro (18GB/512GB)', 'Laptop'],
+    ['m-25', 'Apple', 'MacBook Pro 16" M3 Max (36GB/1TB)', 'Laptop'],
+    ['m-26', 'Genérico', 'Cargador Rápido Tipo-C 20W', 'Cargador'],
+    ['m-27', 'Genérico', 'Cable USB-C a Lightning 1m', 'Cable']
   ];
   var mSheet = ss.getSheetByName('modelos');
   mSheet.getRange(2, 1, defaultModels.length, 4).setValues(defaultModels);
 
-  return JSONResponse({ status: 'success', message: 'Google Sheets formateado con las credenciales de Thor y catálogo de modelos.' });
+  // 5. Crear Lote Inicial de Carga
+  var lSheet = ss.getSheetByName('lotes');
+  var batchId = 'l-thor';
+  lSheet.appendRow([batchId, 'Lote Carga Inicial Thor', 'p-1', 0, '2026-06-08']);
+
+  // 6. Generar Productos y Stock Iniciales Solicitados
+  var productsToInsert = [];
+  
+  // Accesorios (stock 40-60)
+  var chargersStock = Math.floor(Math.random() * 21) + 40;
+  var cablesStock = Math.floor(Math.random() * 21) + 40;
+  productsToInsert.push(['prod-char', batchId, 'Cargador', 'Cargador Rápido Tipo-C 20W', 'ninguno', '', 60000, 60000, 72000, 72000, chargersStock, 'disponible', '']);
+  productsToInsert.push(['prod-cable', batchId, 'Cable', 'Cable USB-C a Lightning 1m', 'ninguno', '', 30000, 30000, 36000, 36000, cablesStock, 'disponible', '']);
+
+  // Celulares (stock 5-15, precios de mercado realistas)
+  var phoneList = [
+    { name: 'iPhone 11 R 64GB', cost: 1000000 },
+    { name: 'iPhone 13 R 128GB', cost: 1800000 },
+    { name: 'iPhone 14 eSIM 128GB', cost: 2400000 },
+    { name: 'iPhone 14 Chip 128GB', cost: 2600000 },
+    { name: 'iPhone 15 128GB', cost: 3000000 },
+    { name: 'iPhone 15 Pro Max eSIM 256GB', cost: 4200000 },
+    { name: 'iPhone 16 Chip 128GB', cost: 3800000 },
+    { name: 'iPhone 16 Chip 256GB', cost: 4200000 },
+    { name: 'iPhone 16 Plus 128GB', cost: 4200000 },
+    { name: 'iPhone 16 Pro Chip 128GB', cost: 4800000 },
+    { name: 'iPhone 16 Pro Max Chip 256GB', cost: 5400000 },
+    { name: 'iPhone 17 Chip 256GB', cost: 5200000 },
+    { name: 'iPhone 17 eSIM 256GB', cost: 5000000 },
+    { name: 'iPhone 17 Pro eSIM 256GB', cost: 6000000 },
+    { name: 'iPhone 17 Pro Chip 256GB', cost: 6200000 },
+    { name: 'iPhone 17 Pro eSIM 512GB', cost: 6800000 },
+    { name: 'iPhone 17 Pro Chip 1TB', cost: 7600000 },
+    { name: 'iPhone 17 Pro Max eSIM 256GB', cost: 6800000 },
+    { name: 'iPhone 17 Pro Max Chip 256GB', cost: 7000000 },
+    { name: 'iPhone 17 Pro Max eSIM 512GB', cost: 7600000 },
+    { name: 'iPhone 17 Pro Max Chip 512GB', cost: 7800000 },
+    { name: 'iPhone 17 Pro Max eSIM 1TB', cost: 8800000 }
+  ];
+
+  var pCounter = 1;
+  var imeiBase = 358912345000000;
+  phoneList.forEach(function(p) {
+    var stock = Math.floor(Math.random() * 11) + 5; // 5 a 15
+    var salePrice = Math.round(p.cost * 1.20);
+    for (var s = 0; s < stock; s++) {
+      var prodId = 'prod-c-' + pCounter;
+      var imei = (imeiBase + pCounter).toString();
+      productsToInsert.push([prodId, batchId, 'Celular', p.name, 'imei', imei, p.cost, p.cost, salePrice, salePrice, 1, 'disponible', '']);
+      pCounter++;
+    }
+  });
+
+  // MacBook Pro (stock 5-10, precios de mercado realistas)
+  var macList = [
+    { name: 'MacBook Pro 14" M3 (8GB/512GB)', cost: 6000000 },
+    { name: 'MacBook Pro 14" M3 Pro (18GB/512GB)', cost: 8000000 },
+    { name: 'MacBook Pro 16" M3 Max (36GB/1TB)', cost: 13000000 }
+  ];
+
+  var mCounter = 1;
+  macList.forEach(function(m) {
+    var stock = Math.floor(Math.random() * 6) + 5; // 5 a 10
+    var salePrice = Math.round(m.cost * 1.20);
+    for (var s = 0; s < stock; s++) {
+      var prodId = 'prod-m-' + mCounter;
+      var serial = 'SN-MBP-' + (10000 + mCounter);
+      productsToInsert.push([prodId, batchId, 'Laptop', m.name, 'serial', serial, m.cost, m.cost, salePrice, salePrice, 1, 'disponible', '']);
+      mCounter++;
+    }
+  });
+
+  var prodSheet = ss.getSheetByName('productos');
+  prodSheet.getRange(2, 1, productsToInsert.length, SCHEMAS.productos.length).setValues(productsToInsert);
+
+  return JSONResponse({ status: 'success', message: 'Google Sheets formateado e inicializado con catálogo y stock inicial de Thor.' });
 }
 
 // --- FUNCIONES AUXILIARES ---

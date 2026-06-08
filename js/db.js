@@ -318,6 +318,30 @@ const DB = {
   getVentas() { return this.getCollection('ventas'); },
   getEgresos() { return this.getCollection('egresos'); },
 
+  // --- CRUD HELPERS FOR LOTES AND PRODUCTS ---
+  async saveLote(lote) {
+    const savedLote = await this.saveRow('lotes', lote);
+    await this.recalcularProrrateoLote(savedLote.id);
+    return savedLote;
+  },
+
+  async saveProducto(producto) {
+    const savedProducto = await this.saveRow('productos', producto);
+    await this.recalcularProrrateoLote(savedProducto.loteId);
+    return savedProducto;
+  },
+
+  async deleteProduct(id) {
+    const products = this.getCollection('productos');
+    const prod = products.find(p => p.id === id);
+    const loteId = prod ? prod.loteId : null;
+    const deleted = await this.deleteRow('productos', id);
+    if (deleted && loteId) {
+      await this.recalcularProrrateoLote(loteId);
+    }
+    return deleted;
+  },
+
   // --- OPERACIONES COMPUESTAS Y PRORRATEOS ---
 
   // Recalcular prorrateo de flete en todos los productos de un lote

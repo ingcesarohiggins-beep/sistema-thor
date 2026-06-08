@@ -1,0 +1,13 @@
+{
+  "name": "control_inventario_celulares",
+  "version": "1.0.0",
+  "description": "Sistema de Control de Inventario y Ventas Thor",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve -l 3000 ."
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}

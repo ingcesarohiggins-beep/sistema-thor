@@ -12,9 +12,9 @@
   --border-color: rgba(255, 255, 255, 0.08);
   --border-color-hover: rgba(255, 255, 255, 0.15);
   
-  /* Colores de Acento (Neon/Cyber) */
-  --color-accent: #7c3aed; /* Violeta principal */
-  --color-accent-glow: rgba(124, 58, 237, 0.35);
+  /* Colores de Acento (Dorado THOR) */
+  --color-accent: #bfa15f; /* Dorado principal */
+  --color-accent-glow: rgba(191, 161, 95, 0.35);
   --color-success: #10b981; /* Esmeralda para ventas/ganancias */
   --color-success-glow: rgba(16, 185, 129, 0.3);
   --color-warning: #f59e0b; /* Ámbar para stock bajo */
