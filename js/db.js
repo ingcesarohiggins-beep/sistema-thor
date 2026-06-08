@@ -12,6 +12,22 @@ const DB = {
   async init() {
     // Configurar la URL provista por el usuario como valor predeterminado
     const defaultUrl = 'https://script.google.com/macros/s/AKfycbwNuoqtEyxS9JWgeITZ1EXQq3WPXFWhIG4JevEljiLyMeBzyd5j6ZfSmhHNsi9cIyvWfA/exec';
+    
+    // Limpieza de caché local antigua si existía de sesiones anteriores de pruebas
+    const localSellers = JSON.parse(localStorage.getItem('demo_vendedores')) || [];
+    const hasThorLocal = localSellers.some(s => s.usuario === 'admin@thor.com');
+    if (!hasThorLocal && localStorage.getItem('demo_vendedores')) {
+      console.log("Limpiando caché local antigua para actualizar credenciales de Thor...");
+      localStorage.removeItem('demo_vendedores');
+      localStorage.removeItem('demo_proveedores');
+      localStorage.removeItem('demo_clientes');
+      localStorage.removeItem('demo_lotes');
+      localStorage.removeItem('demo_productos');
+      localStorage.removeItem('demo_ventas');
+      localStorage.removeItem('demo_egresos');
+      localStorage.removeItem('demo_modelos');
+    }
+
     this.apiURL = localStorage.getItem('cel_google_sheet_url') || defaultUrl;
     
     // Si no está guardado aún en localStorage, lo guardamos para consistencia
@@ -39,7 +55,6 @@ const DB = {
     
     // Iniciar Mocks si no existen localmente
     if (!localStorage.getItem('demo_vendedores')) {
-      // Credenciales solicitadas por el usuario
       const defaultSellers = [
         { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' },
         { id: 'v-2', nombre: 'Vendedor Uno', usuario: 'vendedor1@thor.com', contrasena: 'ventasthor1', rol: 'vendedor' },
@@ -96,7 +111,7 @@ const DB = {
       localStorage.setItem('demo_modelos', JSON.stringify(defaultModels));
     }
 
-    // Cargar caché desde LocalStorage para operar rápido
+    // Cargar caché desde LocalStorage
     const tables = ['vendedores', 'proveedores', 'clientes', 'lotes', 'productos', 'ventas', 'egresos', 'modelos'];
     tables.forEach(t => {
       this.cache[t] = JSON.parse(localStorage.getItem('demo_' + t)) || [];
@@ -111,12 +126,67 @@ const DB = {
       const json = await res.json();
       if (json.status === 'success') {
         this.cache = json.data;
+        
+        // BOOTSTRAP AUTOMÁTICO: Si la base de datos en la nube está vacía de usuarios, inicializarla
+        if (!this.cache.vendedores || this.cache.vendedores.length === 0) {
+          console.log("Inicializando base de datos vacía en Google Sheets...");
+          await this.bootstrapGoogleSheets();
+        }
         return true;
       }
       return false;
     } catch (e) {
       console.error("Error al sincronizar con Google Sheets:", e);
       return false;
+    }
+  },
+
+  // Inicialización automática de datos requeridos en Google Sheets
+  async bootstrapGoogleSheets() {
+    const defaultSellers = [
+      { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' },
+      { id: 'v-2', nombre: 'Vendedor Uno', usuario: 'vendedor1@thor.com', contrasena: 'ventasthor1', rol: 'vendedor' },
+      { id: 'v-3', nombre: 'Vendedor Dos', usuario: 'vendedor2@thor.com', contrasena: 'ventasthor2', rol: 'vendedor' }
+    ];
+    for (let s of defaultSellers) {
+      await this.saveRow('vendedores', s);
+    }
+
+    const defaultModels = [
+      { id: 'm-1', marca: 'Samsung', modelo: 'Samsung Galaxy S23 Ultra', tipo: 'Celular' },
+      { id: 'm-2', marca: 'Xiaomi', modelo: 'Xiaomi Redmi Note 13 Pro', tipo: 'Celular' },
+      { id: 'm-3', marca: 'Apple', modelo: 'iPhone 15 Pro Max', tipo: 'Celular' },
+      { id: 'm-4', marca: 'Lenovo', modelo: 'Laptop Lenovo ThinkPad L14', tipo: 'Laptop' },
+      { id: 'm-5', marca: 'Genérico', modelo: 'Cargador Rápido Tipo-C 25W', tipo: 'Cargador' },
+      { id: 'm-6', marca: 'Genérico', modelo: 'Cable Trenzado Tipo-C a C 2m', tipo: 'Cable' }
+    ];
+    for (let m of defaultModels) {
+      await this.saveRow('modelos', m);
+    }
+
+    // Cargar proveedores iniciales de prueba
+    const defaultProviders = [
+      { id: 'p-1', nombre: 'Celular Express Mayorista', telefono: '+57 312 4567890', email: 'ventas@celularexpress.com' },
+      { id: 'p-2', nombre: 'Accesorios & Cargas SAS', telefono: '+57 300 9876543', email: 'contacto@accesorioscargas.com' }
+    ];
+    for (let p of defaultProviders) {
+      await this.saveRow('proveedores', p);
+    }
+
+    // Cargar clientes iniciales de prueba
+    const defaultClients = [
+      { id: 'c-general', nombre: 'Cliente General (Venta Rápida)', documento: '99999999', telefono: '00000000' },
+      { id: 'c-1', nombre: 'María Camila Ortega', documento: '1098765432', telefono: '+57 315 2223344' }
+    ];
+    for (let c of defaultClients) {
+      await this.saveRow('clientes', c);
+    }
+
+    // Volver a descargar todo ya inicializado
+    const res = await fetch(`${this.apiURL}?action=getAll`, { method: 'GET' });
+    const json = await res.json();
+    if (json.status === 'success') {
+      this.cache = json.data;
     }
   },
 
@@ -138,6 +208,10 @@ const DB = {
         this.apiURL = url;
         this.isDemoMode = false;
         this.cache = json.data;
+        
+        if (!this.cache.vendedores || this.cache.vendedores.length === 0) {
+          await this.bootstrapGoogleSheets();
+        }
         return { success: true, message: '¡Conexión establecida con éxito!' };
       }
       return { success: false, message: 'La URL no devolvió una estructura válida.' };
@@ -236,6 +310,13 @@ const DB = {
 
   // --- MODELOS ---
   getModelos() { return this.getCollection('modelos'); },
+  getVendedores() { return this.getCollection('vendedores'); },
+  getClientes() { return this.getCollection('clientes'); },
+  getProveedores() { return this.getCollection('proveedores'); },
+  getLotes() { return this.getCollection('lotes'); },
+  getProductos() { return this.getCollection('productos'); },
+  getVentas() { return this.getCollection('ventas'); },
+  getEgresos() { return this.getCollection('egresos'); },
 
   // --- OPERACIONES COMPUESTAS Y PRORRATEOS ---
 
@@ -284,10 +365,8 @@ const DB = {
 
   // Registrar venta
   async registrarVentaCompleta(venta) {
-    // 1. Guardar la venta
     const ventaGuardada = await this.saveRow('ventas', venta);
 
-    // 2. Descontar Inventario
     const productos = this.getCollection('productos');
     for (let art of venta.articulos) {
       const prod = productos.find(p => p.id === art.productoId);
@@ -310,7 +389,6 @@ const DB = {
     const prod = productos.find(p => p.id === prodId);
     if (!prod) return false;
 
-    // 1. Cambiar estado a 'baja' y guardar detalles del acta
     prod.estado = 'baja';
     prod.bajaDetalle = {
       motivo,
@@ -321,7 +399,6 @@ const DB = {
     };
     await this.saveRow('productos', prod);
 
-    // 2. Registrar el Egreso (Pérdida contable)
     const egreso = {
       id: null,
       descripcion: `[BAJA:${prod.id}] - ${prod.modelo} (${prod.codigo || 'Sin código'}) - Motivo: ${motivo}`,
@@ -340,7 +417,6 @@ const DB = {
     const prodOriginal = productos.find(p => p.id === prodBajaId);
     if (!prodOriginal || prodOriginal.estado !== 'baja') return false;
 
-    // 1. Marcar el producto viejo como 'reemplazado'
     prodOriginal.estado = 'reemplazado';
     if (!prodOriginal.reemplazoDetalle) prodOriginal.reemplazoDetalle = {};
     prodOriginal.reemplazoDetalle = {
@@ -351,7 +427,6 @@ const DB = {
     };
     await this.saveRow('productos', prodOriginal);
 
-    // 2. Crear el nuevo producto listo para la venta (hereda costos del lote)
     const nuevoProd = {
       id: null,
       loteId: prodOriginal.loteId,
@@ -365,21 +440,17 @@ const DB = {
       precioVenta: prodOriginal.precioVenta,
       stock: 1,
       estado: 'disponible',
-      foto: nuevaFotoBase64 || prodOriginal.foto // Si no hay nueva, hereda la anterior
+      foto: nuevaFotoBase64 || prodOriginal.foto
     };
     await this.saveRow('productos', nuevoProd);
 
-    // 3. Anular/Revertir el Egreso por Pérdida
-    // Buscamos el egreso que contenga la marca del producto dado de baja [BAJA:ID]
     const egresos = this.getCollection('egresos');
     const egresoOriginal = egresos.find(e => e.descripcion.includes(`[BAJA:${prodOriginal.id}]`));
     
     if (egresoOriginal) {
       if (this.isDemoMode) {
-        // En modo demo simplemente lo eliminamos del LocalStorage
         await this.deleteRow('egresos', egresoOriginal.id);
       } else {
-        // En Sheets lo ponemos a $0 y actualizamos descripción para mantener rastro
         egresoOriginal.monto = 0;
         egresoOriginal.descripcion = `[REEMPLAZADO] ${egresoOriginal.descripcion}`;
         await this.saveRow('egresos', egresoOriginal);
@@ -433,7 +504,6 @@ const DB = {
     };
   },
 
-  // Calcular el valorizado de todo el almacén (inventario activo disponible)
   getValuedInventory() {
     const productos = this.getCollection('productos').filter(p => p.estado === 'disponible');
     

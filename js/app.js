@@ -19,7 +19,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Cargar sesión anterior o usar Admin por defecto
   const lastUserId = localStorage.getItem('cel_active_user_id') || 'v-1';
   const sellers = DB.getVendedores();
-  currentUser = sellers.find(s => s.id === lastUserId) || sellers[0];
+  
+  // COMPROBACIÓN DEFENSIVA: Evitar que el JS colapse si la DB carga vacía
+  if (sellers.length === 0) {
+    currentUser = { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' };
+  } else {
+    currentUser = sellers.find(s => s.id === lastUserId) || sellers[0];
+  }
   
   // Actualizar UI del usuario y conexión
   updateUserUI();
@@ -123,17 +129,19 @@ function updateCurrentDate() {
 
 // --- GESTIÓN DE ROLES E INICIO DE SESIÓN ---
 function updateUserUI() {
+  if (!currentUser) return;
+
   // Guardar sesión
   localStorage.setItem('cel_active_user_id', currentUser.id);
 
   // Avatar e información
-  document.getElementById('current-user-avatar').textContent = currentUser.nombre.charAt(0).toUpperCase();
-  document.getElementById('current-user-name').textContent = currentUser.nombre;
+  document.getElementById('current-user-avatar').textContent = currentUser.nombre ? currentUser.nombre.charAt(0).toUpperCase() : 'U';
+  document.getElementById('current-user-name').textContent = currentUser.nombre || 'Usuario';
   
   const roleBadge = document.getElementById('current-user-role-badge');
   const roleText = document.getElementById('current-user-role-text');
   
-  roleBadge.className = `role-badge ${currentUser.rol}`;
+  roleBadge.className = `role-badge ${currentUser.rol || 'admin'}`;
   roleText.textContent = currentUser.rol === 'admin' ? 'Administrador' : 'Vendedor';
 
   // Mostrar u ocultar opciones administrativas
@@ -159,7 +167,12 @@ function updateUserUI() {
 function openRoleSwitcherModal() {
   const sellers = DB.getVendedores();
   const select = document.getElementById('role-select-user');
-  select.innerHTML = sellers.map(s => `<option value="${s.id}">${s.usuario} (${s.rol === 'admin' ? 'Admin' : 'Vendedor'})</option>`).join('');
+  
+  if (sellers.length === 0) {
+    select.innerHTML = '<option value="">Cargando usuarios...</option>';
+  } else {
+    select.innerHTML = sellers.map(s => `<option value="${s.id}">${s.usuario} (${s.rol === 'admin' ? 'Admin' : 'Vendedor'})</option>`).join('');
+  }
   
   document.getElementById('role-input-password').value = '';
   openModal('modal-role-switcher');
@@ -190,6 +203,7 @@ function openModal(id) {
   document.getElementById(id).classList.add('active');
 }
 
+// Cerrar y detener cámara
 function closeModal(id) {
   document.getElementById(id).classList.remove('active');
   stopCameraStream();
@@ -214,7 +228,7 @@ function renderDashboard() {
   const utilNetaVal = document.getElementById('dash-utilidad');
   const utilLabel = document.getElementById('dash-utilidad-label');
   
-  if (currentUser.rol === 'admin') {
+  if (currentUser && currentUser.rol === 'admin') {
     utilLabel.textContent = 'Utilidad Neta (Hoy)';
     utilNetaVal.textContent = formatCurrency(summary.utilidadNeta);
   } else {
@@ -285,7 +299,7 @@ function renderChart(summary) {
   const dataValues = [summary.totalVendido, summary.totalEgresos];
   const colors = ['#10b981', '#ef4444'];
   
-  if (currentUser.rol === 'admin') {
+  if (currentUser && currentUser.rol === 'admin') {
     labels.push('Utilidad Neta');
     dataValues.push(Math.max(0, summary.utilidadNeta));
     colors.push('#7c3aed');
@@ -596,7 +610,7 @@ function renderInventory() {
     lotes.map(l => `<option value="${l.id}">${l.nombre}</option>`).join('');
   filterBatchSelect.value = oldVal;
 
-  const isAdmin = currentUser.rol === 'admin';
+  const isAdmin = currentUser && currentUser.rol === 'admin';
 
   const valCards = document.getElementById('inventory-valuation-cards');
   if (isAdmin) {
@@ -808,10 +822,7 @@ function populateModelsSelector(selectedId = '') {
   const presetSelect = document.getElementById('prod-modelo-preset');
   const models = DB.getCollection('modelos');
   
-  // Agrupar por marcas para un dropdown más limpio y ordenado
   let options = '<option value="">--- Escribir modelo manualmente ---</option>';
-  
-  // Ordenar modelos por marca
   models.sort((a,b) => a.marca.localeCompare(b.marca));
   
   models.forEach(m => {
@@ -833,10 +844,8 @@ function onModelPresetChanged() {
     tipoInput.value = matched.tipo;
     modeloInput.value = matched.modelo;
     
-    // Disparar validaciones correspondientes al tipo
     onProductTypeChanged();
   } else {
-    // Si elige manual, limpiar para que escriba
     modeloInput.value = '';
   }
 }
@@ -861,9 +870,8 @@ async function saveNewModelForm(event) {
     const saved = await DB.saveRow('modelos', model);
     closeModal('modal-nuevo-modelo');
     
-    // Recargar el catálogo y seleccionar el recién creado
     populateModelsSelector(saved.id);
-    onModelPresetChanged(); // autocompletar campos
+    onModelPresetChanged();
     alert("Modelo agregado al catálogo con éxito.");
   } catch (e) {
     alert("Error al registrar modelo en el catálogo.");
@@ -883,7 +891,6 @@ function openNewProductModal(isEdit = false) {
   const lotes = DB.getLotes();
   document.getElementById('prod-lote').innerHTML = lotes.map(l => `<option value="${l.id}">${l.nombre}</option>`).join('');
 
-  // Cargar catálogo de modelos predefinidos
   populateModelsSelector();
 
   if (!isEdit) {
