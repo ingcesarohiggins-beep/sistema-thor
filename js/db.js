@@ -33,15 +33,17 @@ const DB = {
     }
   },
 
-  // Inicializar base de datos local (Modo Demo / Fallback)
+  // Inicializar base de datos local (Modo Demo / Fallback) con credenciales de Thor y modelos
   initLocalDemo() {
     console.log("Iniciando Modo Demo en LocalStorage...");
     
     // Iniciar Mocks si no existen localmente
     if (!localStorage.getItem('demo_vendedores')) {
+      // Credenciales solicitadas por el usuario
       const defaultSellers = [
-        { id: 'v-1', nombre: 'Administrador Principal', usuario: 'admin', contrasena: 'admin', rol: 'admin' },
-        { id: 'v-2', nombre: 'Juan Vendedor', usuario: 'juan', contrasena: '1234', rol: 'vendedor' }
+        { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' },
+        { id: 'v-2', nombre: 'Vendedor Uno', usuario: 'vendedor1@thor.com', contrasena: 'ventasthor1', rol: 'vendedor' },
+        { id: 'v-3', nombre: 'Vendedor Dos', usuario: 'vendedor2@thor.com', contrasena: 'ventasthor2', rol: 'vendedor' }
       ];
       localStorage.setItem('demo_vendedores', JSON.stringify(defaultSellers));
       
@@ -73,31 +75,29 @@ const DB = {
           id: 'prod-2', loteId: 'l-1', tipo: 'Celular', modelo: 'Xiaomi Redmi Note 13 Pro', 
           tipoCodigo: 'imei', codigo: '354456789123456', costoBase: 1500000, costoReal: 1545000, 
           precioSugerido: 1854000, precioVenta: 1854000, stock: 1, estado: 'disponible', foto: '' 
-        },
-        { 
-          id: 'prod-3', loteId: 'l-2', tipo: 'Cargador', modelo: 'Cargador Rápido Tipo-C 25W', 
-          tipoCodigo: 'ninguno', codigo: '', costoBase: 30000, costoReal: 33000, 
-          precioSugerido: 39600, precioVenta: 39600, stock: 25, estado: 'disponible', foto: '' 
         }
       ];
       localStorage.setItem('demo_productos', JSON.stringify(defaultProducts));
 
-      const defaultSales = [
-        {
-          id: 'vta-1', clienteId: 'c-1', vendedorId: 'v-2', fecha: new Date().toISOString(), total: 1854000, metodoPago: 'efectivo',
-          articulos: [{ productoId: 'prod-2', modelo: 'Xiaomi Redmi Note 13 Pro', imei: '354456789123456', precioVenta: 1854000, costoReal: 1545000, cantidad: 1 }]
-        }
-      ];
+      const defaultSales = [];
       localStorage.setItem('demo_ventas', JSON.stringify(defaultSales));
 
-      const defaultExpenses = [
-        { id: 'egr-1', descripcion: 'Papelería y Cinta', monto: 12000, fecha: new Date().toISOString().split('T')[0], vendedorId: 'v-2' }
-      ];
+      const defaultExpenses = [];
       localStorage.setItem('demo_egresos', JSON.stringify(defaultExpenses));
+
+      const defaultModels = [
+        { id: 'm-1', marca: 'Samsung', modelo: 'Samsung Galaxy S23 Ultra', tipo: 'Celular' },
+        { id: 'm-2', marca: 'Xiaomi', modelo: 'Xiaomi Redmi Note 13 Pro', tipo: 'Celular' },
+        { id: 'm-3', marca: 'Apple', modelo: 'iPhone 15 Pro Max', tipo: 'Celular' },
+        { id: 'm-4', marca: 'Lenovo', modelo: 'Laptop Lenovo ThinkPad L14', tipo: 'Laptop' },
+        { id: 'm-5', marca: 'Genérico', modelo: 'Cargador Rápido Tipo-C 25W', tipo: 'Cargador' },
+        { id: 'm-6', marca: 'Genérico', modelo: 'Cable Trenzado Tipo-C a C 2m', tipo: 'Cable' }
+      ];
+      localStorage.setItem('demo_modelos', JSON.stringify(defaultModels));
     }
 
     // Cargar caché desde LocalStorage para operar rápido
-    const tables = ['vendedores', 'proveedores', 'clientes', 'lotes', 'productos', 'ventas', 'egresos'];
+    const tables = ['vendedores', 'proveedores', 'clientes', 'lotes', 'productos', 'ventas', 'egresos', 'modelos'];
     tables.forEach(t => {
       this.cache[t] = JSON.parse(localStorage.getItem('demo_' + t)) || [];
     });
@@ -233,6 +233,9 @@ const DB = {
       }
     }
   },
+
+  // --- MODELOS ---
+  getModelos() { return this.getCollection('modelos'); },
 
   // --- OPERACIONES COMPUESTAS Y PRORRATEOS ---
 
@@ -463,6 +466,7 @@ const DB = {
       localStorage.removeItem('demo_productos');
       localStorage.removeItem('demo_ventas');
       localStorage.removeItem('demo_egresos');
+      localStorage.removeItem('demo_modelos');
       this.initLocalDemo();
       return true;
     } else {

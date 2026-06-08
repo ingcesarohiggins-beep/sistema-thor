@@ -625,10 +625,26 @@
           <div class="form-row">
             <div class="form-group">
               <label for="prod-lote">Lote Asignado</label>
-              <select id="prod-lote" required>
+              <select id="prod-lote" required onchange="calculateSuggestedPriceFromForm()">
                 <!-- Dinámico -->
               </select>
             </div>
+            
+            <!-- Selector de Modelo de Catálogo (Requisito Solicitado) -->
+            <div class="form-group">
+              <label for="prod-modelo-preset">Modelo Predefinido (Catálogo)</label>
+              <div class="input-with-action">
+                <select id="prod-modelo-preset" onchange="onModelPresetChanged()">
+                  <!-- Dinámico -->
+                </select>
+                <button type="button" class="btn btn-secondary" onclick="openNewModelModal()" title="Agregar modelo al catálogo">
+                  <i class="fa-solid fa-plus"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
             <div class="form-group">
               <label for="prod-tipo">Tipo de Artículo</label>
               <select id="prod-tipo" onchange="onProductTypeChanged()" required>
@@ -639,11 +655,10 @@
                 <option value="Otro">Otro</option>
               </select>
             </div>
-          </div>
-
-          <div class="form-group">
-            <label for="prod-modelo">Marca / Modelo / Descripción</label>
-            <input type="text" id="prod-modelo" class="form-control" placeholder="Ej. Samsung S24 256GB / Cargador OEM 20W" required>
+            <div class="form-group">
+              <label for="prod-modelo">Descripción / Nombre del Equipo</label>
+              <input type="text" id="prod-modelo" class="form-control" placeholder="Ej. Samsung S24 256GB / Cargador OEM 20W" required>
+            </div>
           </div>
 
           <!-- Selector de Código (Requisito Especial) -->
@@ -970,6 +985,42 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-reemplazo')">Cancelar</button>
           <button type="submit" class="btn btn-success">Recibir e Ingresar Stock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 10: NUEVO MODELO EN CATÁLOGO (Requisito Solicitado) -->
+  <div class="modal-backdrop" id="modal-nuevo-modelo">
+    <div class="modal-card" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>✨ Agregar Modelo al Catálogo</h3>
+        <button class="btn-close" onclick="closeModal('modal-nuevo-modelo')">&times;</button>
+      </div>
+      <form id="form-nuevo-modelo" onsubmit="saveNewModelForm(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="model-marca">Marca / Fabricante</label>
+            <input type="text" id="model-marca" class="form-control" placeholder="Ej. Samsung, Apple, Lenovo" required>
+          </div>
+          <div class="form-group">
+            <label for="model-nombre">Nombre Comercial del Modelo</label>
+            <input type="text" id="model-nombre" class="form-control" placeholder="Ej. Galaxy S24 Ultra" required>
+          </div>
+          <div class="form-group">
+            <label for="model-tipo">Tipo de Artículo</label>
+            <select id="model-tipo" required>
+              <option value="Celular">Celular</option>
+              <option value="Laptop">Laptop</option>
+              <option value="Cargador">Cargador</option>
+              <option value="Cable">Cable</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-nuevo-modelo')">Cancelar</button>
+          <button type="submit" class="btn btn-success">Agregar al Catálogo</button>
         </div>
       </form>
     </div>

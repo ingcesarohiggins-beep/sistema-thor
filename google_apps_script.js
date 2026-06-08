@@ -1,21 +1,18 @@
 /**
  * Google Apps Script - API REST para Sistema de Control de Inventario y Ventas
  * 
- * INSTRUCCIONES DE INSTALACIÓN:
- * 1. Crea una nueva Hoja de Cálculo en Google Drive.
- * 2. Ve al menú superior: Extensiones > Apps Script.
- * 3. Borra el código existente y pega este archivo completo.
- * 4. Haz clic en "Implementar" (botón azul arriba a la derecha) > "Nueva implementación".
- * 5. Tipo de implementación: selecciona "Aplicación web" (icono de engranaje).
- * 6. Configuración:
- *    - Descripción: API Control Inventario
- *    - Ejecutar como: "Tú" (tu cuenta de Google)
- *    - Quién tiene acceso: "Cualquiera" (esto permite que la web acceda sin login complejo).
- * 7. Haz clic en "Implementar", autoriza los permisos y COPIA la "URL de la aplicación web".
- * 8. Pega esa URL en el panel de Administración de la aplicación web.
+ * INSTRUCCIONES DE ACTUALIZACIÓN:
+ * 1. Abre tu Hoja de Cálculo en Google Sheets.
+ * 2. Ve a Extensiones > Apps Script.
+ * 3. Borra el código actual, pega este código actualizado.
+ * 4. Haz clic en "Guardar" (icono de disquete).
+ * 5. Haz clic en "Implementar" > "Administrar implementaciones".
+ * 6. Selecciona tu implementación actual (Aplicación web), haz clic en el lápiz (Editar).
+ * 7. En "Versión", selecciona "Nueva versión".
+ * 8. Haz clic en "Implementar" (¡muy importante para que los cambios se activen!).
  */
 
-// Pestañas por defecto y sus encabezados de columnas
+// Pestañas por defecto y sus encabezados de columnas (Se añadió 'modelos')
 const SCHEMAS = {
   vendedores: ['id', 'nombre', 'usuario', 'contrasena', 'rol'],
   proveedores: ['id', 'nombre', 'telefono', 'email'],
@@ -23,14 +20,13 @@ const SCHEMAS = {
   lotes: ['id', 'nombre', 'proveedorId', 'flete', 'fecha'],
   productos: ['id', 'loteId', 'tipo', 'modelo', 'tipoCodigo', 'codigo', 'costoBase', 'costoReal', 'precioSugerido', 'precioVenta', 'stock', 'estado', 'foto'],
   ventas: ['id', 'clienteId', 'vendedorId', 'fecha', 'total', 'articulos', 'metodoPago'],
-  egresos: ['id', 'descripcion', 'monto', 'fecha', 'vendedorId']
+  egresos: ['id', 'descripcion', 'monto', 'fecha', 'vendedorId'],
+  modelos: ['id', 'marca', 'modelo', 'tipo'] // Catálogo de Modelos sugerido
 };
 
 function doGet(e) {
   try {
     var action = e.parameter.action;
-    
-    // Autogenerar pestañas faltantes al leer
     checkAndCreateSheets();
 
     if (action === 'getAll') {
@@ -68,7 +64,6 @@ function doPost(e) {
 
 // --- MANEJADORES DE OPERACIONES ---
 
-// Obtener todas las tablas en un solo objeto JSON consolidado
 function handleGetAll() {
   var db = {};
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -81,7 +76,6 @@ function handleGetAll() {
   return JSONResponse({ status: 'success', data: db });
 }
 
-// Guardar o Actualizar una fila según su campo 'id'
 function handleSave(sheetName, rowData) {
   if (!SCHEMAS[sheetName]) {
     return JSONResponse({ status: 'error', message: 'Nombre de hoja no válido: ' + sheetName });
@@ -95,23 +89,19 @@ function handleSave(sheetName, rowData) {
   var idIndex = headers.indexOf('id');
   var foundRowIndex = -1;
   
-  // Buscar si ya existe la fila por ID (empezando en fila 2 para saltar cabeceras)
   if (rowData.id) {
     for (var i = 1; i < data.length; i++) {
       if (data[i][idIndex] && data[i][idIndex].toString() === rowData.id.toString()) {
-        foundRowIndex = i + 1; // 1-based index
+        foundRowIndex = i + 1;
         break;
       }
     }
   } else {
-    // Si no tiene ID, le generamos uno único
     rowData.id = sheetName.substring(0, 3) + '-' + new Date().getTime() + Math.floor(Math.random() * 1000);
   }
 
-  // Alinear valores de rowData con el orden de las cabeceras
   var rowValues = headers.map(function(header) {
     var val = rowData[header];
-    // Convertir arreglos u objetos a JSON text para almacenarlo en celdas
     if (typeof val === 'object' && val !== null) {
       return JSON.stringify(val);
     }
@@ -119,17 +109,14 @@ function handleSave(sheetName, rowData) {
   });
 
   if (foundRowIndex !== -1) {
-    // Actualizar fila existente
     sheet.getRange(foundRowIndex, 1, 1, headers.length).setValues([rowValues]);
   } else {
-    // Agregar nueva fila
     sheet.appendRow(rowValues);
   }
 
   return JSONResponse({ status: 'success', data: rowData });
 }
 
-// Eliminar una fila por su campo 'id'
 function handleDelete(sheetName, id) {
   if (!SCHEMAS[sheetName]) {
     return JSONResponse({ status: 'error', message: 'Nombre de hoja no válido' });
@@ -152,11 +139,10 @@ function handleDelete(sheetName, id) {
   return JSONResponse({ status: 'error', message: 'No se encontró el ID a eliminar' });
 }
 
-// Resetear y cargar datos mock por defecto
+// Resetear y cargar credenciales personalizadas de usuarios
 function handleReset() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  // Borrar todas las hojas
   var sheets = ss.getSheets();
   sheets.forEach(function(s) {
     try {
@@ -169,21 +155,21 @@ function handleReset() {
     } catch(e){}
   });
 
-  // Re-crear pestañas con cabeceras y mocks básicos
   checkAndCreateSheets();
   
-  // Borrar hoja temp si existe
   var temp = ss.getSheetByName('temp_clean');
   if (temp) ss.deleteSheet(temp);
 
-  // Inyectar datos mock iniciales directamente
+  // 1. Cargar Usuarios Predeterminados Solicitados
   var defaultSellers = [
-    ['v-1', 'Administrador Principal', 'admin', 'admin', 'admin'],
-    ['v-2', 'Juan Vendedor', 'juan', '1234', 'vendedor']
+    ['v-1', 'Administrador Thor', 'admin@thor.com', 'thor1996', 'admin'],
+    ['v-2', 'Vendedor Uno', 'vendedor1@thor.com', 'ventasthor1', 'vendedor'],
+    ['v-3', 'Vendedor Dos', 'vendedor2@thor.com', 'ventasthor2', 'vendedor']
   ];
   var sSheet = ss.getSheetByName('vendedores');
   sSheet.getRange(2, 1, defaultSellers.length, 5).setValues(defaultSellers);
 
+  // 2. Cargar Proveedores Mock
   var defaultProviders = [
     ['p-1', 'Celular Express Mayorista', '+57 312 4567890', 'ventas@celularexpress.com'],
     ['p-2', 'Accesorios & Cargas SAS', '+57 300 9876543', 'contacto@accesorioscargas.com']
@@ -191,6 +177,7 @@ function handleReset() {
   var pSheet = ss.getSheetByName('proveedores');
   pSheet.getRange(2, 1, defaultProviders.length, 4).setValues(defaultProviders);
 
+  // 3. Cargar Clientes Mock
   var defaultClients = [
     ['c-general', 'Cliente General (Venta Rápida)', '99999999', '00000000'],
     ['c-1', 'María Camila Ortega', '1098765432', '+57 315 2223344']
@@ -198,30 +185,38 @@ function handleReset() {
   var cSheet = ss.getSheetByName('clientes');
   cSheet.getRange(2, 1, defaultClients.length, 4).setValues(defaultClients);
 
-  return JSONResponse({ status: 'success', message: 'Base de datos de Google Sheets reseteada correctamente' });
+  // 4. Cargar Catálogo Inicial de Modelos de Prueba
+  var defaultModels = [
+    ['m-1', 'Samsung', 'Samsung Galaxy S23 Ultra', 'Celular'],
+    ['m-2', 'Xiaomi', 'Xiaomi Redmi Note 13 Pro', 'Celular'],
+    ['m-3', 'Apple', 'iPhone 15 Pro Max', 'Celular'],
+    ['m-4', 'Lenovo', 'Laptop Lenovo ThinkPad L14', 'Laptop'],
+    ['m-5', 'Genérico', 'Cargador Rápido Tipo-C 25W', 'Cargador'],
+    ['m-6', 'Genérico', 'Cable Trenzado Tipo-C a C 2m', 'Cable']
+  ];
+  var mSheet = ss.getSheetByName('modelos');
+  mSheet.getRange(2, 1, defaultModels.length, 4).setValues(defaultModels);
+
+  return JSONResponse({ status: 'success', message: 'Google Sheets formateado con las credenciales de Thor y catálogo de modelos.' });
 }
 
 // --- FUNCIONES AUXILIARES ---
 
-// Retornar respuesta JSON con CORS permitido
 function JSONResponse(object) {
   return ContentService.createTextOutput(JSON.stringify(object))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// Leer datos de una hoja y transformarlos a arreglo de objetos clave-valor
 function getSheetData(sheet) {
   var rows = [];
   var data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return []; // Solo cabecera o vacía
+  if (data.length <= 1) return [];
 
   var headers = data[0];
   for (var i = 1; i < data.length; i++) {
     var row = {};
     for (var j = 0; j < headers.length; j++) {
       var cellVal = data[i][j];
-      
-      // Intentar parsear celdas que contienen strings JSON (ej. lista de artículos)
       if (typeof cellVal === 'string' && (cellVal.startsWith('[') || cellVal.startsWith('{'))) {
         try {
           cellVal = JSON.parse(cellVal);
@@ -234,7 +229,6 @@ function getSheetData(sheet) {
   return rows;
 }
 
-// Verificar existencia de pestañas y crearlas con cabeceras si no existen
 function checkAndCreateSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   for (var sheetName in SCHEMAS) {
@@ -242,7 +236,6 @@ function checkAndCreateSheets() {
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
       sheet.appendRow(SCHEMAS[sheetName]);
-      // Dar formato en negrita a la cabecera
       sheet.getRange(1, 1, 1, SCHEMAS[sheetName].length).setFontWeight("bold");
     }
   }

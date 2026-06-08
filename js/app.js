@@ -99,7 +99,6 @@ async function switchView(viewId) {
   } else if (viewId === 'ventas') {
     renderSalesView();
   } else if (viewId === 'inventario') {
-    // Si estamos en Sheets, sincronizar antes de renderizar
     if (!DB.isDemoMode) await DB.syncAll();
     renderInventory();
   } else if (viewId === 'egresos') {
@@ -160,7 +159,7 @@ function updateUserUI() {
 function openRoleSwitcherModal() {
   const sellers = DB.getVendedores();
   const select = document.getElementById('role-select-user');
-  select.innerHTML = sellers.map(s => `<option value="${s.id}">${s.nombre} (${s.rol === 'admin' ? 'Admin' : 'Vendedor'})</option>`).join('');
+  select.innerHTML = sellers.map(s => `<option value="${s.id}">${s.usuario} (${s.rol === 'admin' ? 'Admin' : 'Vendedor'})</option>`).join('');
   
   document.getElementById('role-input-password').value = '';
   openModal('modal-role-switcher');
@@ -599,7 +598,6 @@ function renderInventory() {
 
   const isAdmin = currentUser.rol === 'admin';
 
-  // --- RENDER DE VALORACIÓN DE INVENTARIO (EXCLUSIVO ADMIN) ---
   const valCards = document.getElementById('inventory-valuation-cards');
   if (isAdmin) {
     valCards.style.display = 'grid';
@@ -611,7 +609,6 @@ function renderInventory() {
     valCards.style.display = 'none';
   }
 
-  // --- RENDER DE PRODUCTOS ---
   const tbodyProd = document.getElementById('inventory-table-body');
   tbodyProd.innerHTML = '';
 
@@ -649,14 +646,12 @@ function renderInventory() {
 
     const imgSource = p.foto ? `<img src="${p.foto}" style="width: 45px; height: 45px; object-fit: cover; border-radius: 8px;">` : `<i class="fa-solid fa-image" style="font-size: 24px; color: var(--text-dim);"></i>`;
 
-    // Botones de acción dinámicos según estado y rol
     let actionsHtml = `
       <button class="btn btn-secondary btn-sm" onclick="openEditProductModal('${p.id}')" title="Editar">
         <i class="fa-solid fa-pen"></i>
       </button>
     `;
 
-    // Si está disponible, se puede dar de baja (burocrático)
     if (p.estado === 'disponible' && p.tipoCodigo !== 'ninguno') {
       actionsHtml += `
         <button class="btn btn-danger btn-sm" onclick="openBajaModal('${p.id}')" title="Dar de Baja">
@@ -665,7 +660,6 @@ function renderInventory() {
       `;
     }
 
-    // Si está de baja por defecto de fábrica, se puede recibir reemplazo de proveedor (Admin únicamente)
     if (p.estado === 'baja' && p.bajaDetalle && p.bajaDetalle.motivo.includes('Garantía') && isAdmin) {
       actionsHtml += `
         <button class="btn btn-success btn-sm" onclick="openReemplazoModal('${p.id}')" title="Registrar Reemplazo">
@@ -708,7 +702,6 @@ function renderInventory() {
     tbodyProd.appendChild(tr);
   });
 
-  // --- RENDER DE LOTES ---
   const tbodyLotes = document.getElementById('lotes-table-body');
   tbodyLotes.innerHTML = '';
 
@@ -810,6 +803,73 @@ function openEditBatchModal(id) {
   };
 }
 
+// --- GESTIÓN DE CATÁLOGO DE MODELOS PREDETERMINADOS ---
+function populateModelsSelector(selectedId = '') {
+  const presetSelect = document.getElementById('prod-modelo-preset');
+  const models = DB.getCollection('modelos');
+  
+  // Agrupar por marcas para un dropdown más limpio y ordenado
+  let options = '<option value="">--- Escribir modelo manualmente ---</option>';
+  
+  // Ordenar modelos por marca
+  models.sort((a,b) => a.marca.localeCompare(b.marca));
+  
+  models.forEach(m => {
+    options += `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>[${m.tipo}] ${m.marca} - ${m.modelo}</option>`;
+  });
+  
+  presetSelect.innerHTML = options;
+}
+
+function onModelPresetChanged() {
+  const presetId = document.getElementById('prod-modelo-preset').value;
+  const models = DB.getCollection('modelos');
+  const matched = models.find(m => m.id === presetId);
+  
+  const tipoInput = document.getElementById('prod-tipo');
+  const modeloInput = document.getElementById('prod-modelo');
+  
+  if (matched) {
+    tipoInput.value = matched.tipo;
+    modeloInput.value = matched.modelo;
+    
+    // Disparar validaciones correspondientes al tipo
+    onProductTypeChanged();
+  } else {
+    // Si elige manual, limpiar para que escriba
+    modeloInput.value = '';
+  }
+}
+
+function openNewModelModal() {
+  const form = document.getElementById('form-nuevo-modelo');
+  form.reset();
+  openModal('modal-nuevo-modelo');
+}
+
+async function saveNewModelForm(event) {
+  event.preventDefault();
+  
+  const model = {
+    id: null,
+    marca: document.getElementById('model-marca').value.trim(),
+    modelo: document.getElementById('model-nombre').value.trim(),
+    tipo: document.getElementById('model-tipo').value
+  };
+
+  try {
+    const saved = await DB.saveRow('modelos', model);
+    closeModal('modal-nuevo-modelo');
+    
+    // Recargar el catálogo y seleccionar el recién creado
+    populateModelsSelector(saved.id);
+    onModelPresetChanged(); // autocompletar campos
+    alert("Modelo agregado al catálogo con éxito.");
+  } catch (e) {
+    alert("Error al registrar modelo en el catálogo.");
+  }
+}
+
 // CRUD PRODUCTOS
 function openNewProductModal(isEdit = false) {
   const form = document.getElementById('form-producto');
@@ -822,6 +882,9 @@ function openNewProductModal(isEdit = false) {
 
   const lotes = DB.getLotes();
   document.getElementById('prod-lote').innerHTML = lotes.map(l => `<option value="${l.id}">${l.nombre}</option>`).join('');
+
+  // Cargar catálogo de modelos predefinidos
+  populateModelsSelector();
 
   if (!isEdit) {
     document.getElementById('modal-producto-title').textContent = "Registrar Nuevo Producto";
@@ -1165,7 +1228,6 @@ async function submitProductBaja(event) {
   const motivo = document.getElementById('baja-motivo').value;
   const justificacion = document.getElementById('baja-justificacion').value.trim();
 
-  // Validación de la foto obligatoria (regla burocrática)
   if (!bajaPhotoBase64) {
     alert("Error: Es obligatorio tomar o subir una foto de evidencia para respaldar la baja del producto.");
     return;
@@ -1324,7 +1386,6 @@ function viewImeiLifecycle(imei) {
 
   const container = document.getElementById('ciclo-vida-body');
   
-  // Si está dado de baja o reemplazado, mostrar rastro de auditoría
   let auditoriaBajaHtml = '';
   if (prod.estado === 'baja' && prod.bajaDetalle) {
     auditoriaBajaHtml = `
@@ -1616,7 +1677,6 @@ async function deleteSeller(id) {
 async function saveSheetsConfiguration() {
   const url = document.getElementById('sheets-url-input').value.trim();
   
-  // Feedback visual
   const btn = document.querySelector('[onclick="saveSheetsConfiguration()"]');
   const originalHtml = btn.innerHTML;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Conectando...';
