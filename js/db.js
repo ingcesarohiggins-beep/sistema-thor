@@ -10,7 +10,14 @@ const DB = {
 
   // Inicialización
   async init() {
-    this.apiURL = localStorage.getItem('cel_google_sheet_url') || null;
+    // Configurar la URL provista por el usuario como valor predeterminado
+    const defaultUrl = 'https://script.google.com/macros/s/AKfycbwNuoqtEyxS9JWgeITZ1EXQq3WPXFWhIG4JevEljiLyMeBzyd5j6ZfSmhHNsi9cIyvWfA/exec';
+    this.apiURL = localStorage.getItem('cel_google_sheet_url') || defaultUrl;
+    
+    // Si no está guardado aún en localStorage, lo guardamos para consistencia
+    if (!localStorage.getItem('cel_google_sheet_url')) {
+      localStorage.setItem('cel_google_sheet_url', defaultUrl);
+    }
     
     if (this.apiURL) {
       this.isDemoMode = false;
