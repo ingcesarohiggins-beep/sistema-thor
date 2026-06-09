@@ -266,7 +266,7 @@ function renderDashboard() {
     todosMovimientos.push({
       tipo: 'venta',
       titulo: `Venta - Recibo ${v.id.substr(4, 6)}`,
-      sub: `${v.articulos.length} artículos | Pago: ${v.metodoPago}`,
+      sub: `${v.articulos.length} artículos | Pago: ${v.metodoPago.toUpperCase()}${v.referencia ? ' (Ref: ' + v.referencia + ')' : ''}`,
       monto: v.total,
       fecha: new Date(v.fecha)
     });
@@ -553,11 +553,18 @@ async function processSale() {
 
   const clientId = document.getElementById('sales-client-select').value;
   const paymentMethod = document.getElementById('sales-payment-method').value;
+  const paymentRef = document.getElementById('sales-payment-ref').value.trim();
 
   const clients = DB.getClientes();
   const cliente = clients.find(c => c.id === clientId);
   
   const totalVenta = cart.reduce((sum, item) => sum + (item.precioVenta * item.cantidad), 0);
+
+  const btnConfirm = document.getElementById('btn-confirm-sale');
+  if (btnConfirm) {
+    btnConfirm.disabled = true;
+    btnConfirm.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando Venta...';
+  }
 
   const nuevaVenta = {
     id: null,
@@ -566,6 +573,7 @@ async function processSale() {
     fecha: new Date().toISOString(),
     total: totalVenta,
     metodoPago: paymentMethod,
+    referencia: paymentRef,
     articulos: cart.map(item => ({
       productoId: item.productoId,
       modelo: item.modelo,
@@ -581,9 +589,32 @@ async function processSale() {
     PDFGen.generateReceipt(ventaGuardada, cliente, currentUser);
     alert("Venta procesada con éxito y recibo PDF generado.");
     clearCart();
+    
+    // Reset payment ref elements
+    document.getElementById('sales-payment-ref').value = '';
+    document.getElementById('group-payment-ref').style.display = 'none';
+    document.getElementById('sales-payment-method').value = 'efectivo';
+    
     await switchView('dashboard');
   } catch (e) {
     alert("Hubo un error al guardar la venta: " + e.message);
+  } finally {
+    if (btnConfirm) {
+      btnConfirm.disabled = false;
+      btnConfirm.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Confirmar Venta e Imprimir PDF';
+    }
+  }
+}
+
+function togglePaymentRefField() {
+  const method = document.getElementById('sales-payment-method').value;
+  const refGroup = document.getElementById('group-payment-ref');
+  const refInput = document.getElementById('sales-payment-ref');
+  if (method === 'efectivo') {
+    refGroup.style.display = 'none';
+    refInput.value = '';
+  } else {
+    refGroup.style.display = 'block';
   }
 }
 
@@ -711,7 +742,10 @@ function renderInventory() {
     tr.innerHTML = `
       <td style="text-align: center; vertical-align: middle;">${imgSource}</td>
       <td><strong>${p.tipo}</strong></td>
-      <td>${p.modelo}</td>
+      <td>
+        ${p.modelo}
+        ${p.color ? `<div style="font-size: 11px; color: var(--color-accent); margin-top: 2px;"><i class="fa-solid fa-palette" style="font-size: 10px; margin-right: 4px;"></i>Color: ${p.color}</div>` : ''}
+      </td>
       <td>${batch ? batch.nombre : 'Sin Lote'}</td>
       <td>
         ${p.tipoCodigo !== 'ninguno' 
@@ -922,10 +956,19 @@ function openNewProductModal(isEdit = false) {
 function onProductTypeChanged() {
   const tipo = document.getElementById('prod-tipo').value;
   const selectCodigo = document.getElementById('prod-tipo-codigo');
+  const colorWrapper = document.getElementById('prod-color-wrapper');
 
-  if (tipo === 'Celular') selectCodigo.value = 'imei';
-  else if (tipo === 'Laptop') selectCodigo.value = 'serial';
-  else selectCodigo.value = 'ninguno';
+  if (tipo === 'Celular') {
+    selectCodigo.value = 'imei';
+    colorWrapper.style.display = 'block';
+  } else if (tipo === 'Laptop') {
+    selectCodigo.value = 'serial';
+    colorWrapper.style.display = 'block';
+  } else {
+    selectCodigo.value = 'ninguno';
+    colorWrapper.style.display = 'none';
+    document.getElementById('prod-color').value = '';
+  }
 
   onTypeCodeChanged();
 }
@@ -1065,6 +1108,7 @@ async function saveProductoForm(event) {
   const loteId = document.getElementById('prod-lote').value;
   const tipo = document.getElementById('prod-tipo').value;
   const modelo = document.getElementById('prod-modelo').value.trim();
+  const color = (tipo === 'Celular' || tipo === 'Laptop') ? document.getElementById('prod-color').value.trim() : '';
   const tipoCodigo = document.getElementById('prod-tipo-codigo').value;
   const codigo = tipoCodigo !== 'ninguno' ? document.getElementById('prod-codigo').value.trim() : '';
   const stock = tipoCodigo === 'ninguno' ? parseInt(document.getElementById('prod-stock').value) || 0 : 1;
@@ -1093,18 +1137,23 @@ async function saveProductoForm(event) {
     return;
   }
 
+  const existing = products.find(p => p.id === id);
+  const estado = existing ? existing.estado : 'disponible';
+  const existingPhoto = existing ? existing.foto : '';
+
   const producto = {
     id: id || null,
     loteId,
     tipo,
     modelo,
+    color,
     tipoCodigo,
     codigo,
     stock,
     costoBase,
     precioVenta,
-    foto: productPhotoBase64,
-    estado: 'disponible'
+    foto: productPhotoBase64 || existingPhoto,
+    estado: estado
   };
 
   try {
@@ -1129,7 +1178,15 @@ function openEditProductModal(id) {
   document.getElementById('prod-lote').value = p.loteId;
   document.getElementById('prod-tipo').value = p.tipo;
   document.getElementById('prod-modelo').value = p.modelo;
+  document.getElementById('prod-color').value = p.color || '';
   document.getElementById('prod-tipo-codigo').value = p.tipoCodigo;
+
+  const colorWrapper = document.getElementById('prod-color-wrapper');
+  if (p.tipo === 'Celular' || p.tipo === 'Laptop') {
+    colorWrapper.style.display = 'block';
+  } else {
+    colorWrapper.style.display = 'none';
+  }
   
   onTypeCodeChanged();
 
@@ -1440,6 +1497,7 @@ function viewImeiLifecycle(imei) {
       <div style="background-color: var(--bg-primary); padding: 14px; border-radius: 10px; border: 1px solid var(--border-color);">
         <h4 style="color: var(--color-info); margin-bottom: 8px;">📱 Datos del Producto</h4>
         <p><strong>Modelo:</strong> ${prod.modelo}</p>
+        ${prod.color ? `<p><strong>Color:</strong> ${prod.color}</p>` : ''}
         <p><strong>IMEI/Serial:</strong> ${prod.codigo}</p>
         <p><strong>Costo Adquisición:</strong> ${formatCurrency(prod.costoReal)}</p>
         <p><strong>Precio Venta:</strong> ${formatCurrency(prod.precioVenta)}</p>
@@ -1458,7 +1516,7 @@ function viewImeiLifecycle(imei) {
           <p><strong>Fecha de Venta:</strong> ${new Date(sale.fecha).toLocaleString()}</p>
           <p><strong>Cliente:</strong> ${client ? client.nombre : 'N/A'}</p>
           <p><strong>Vendido por:</strong> ${seller ? seller.nombre : 'N/A'}</p>
-          <p><strong>Método Pago:</strong> ${sale.metodoPago.toUpperCase()}</p>
+          <p><strong>Método Pago:</strong> ${sale.metodoPago.toUpperCase()}${sale.referencia ? ` (Ref: ${sale.referencia})` : ''}</p>
           <p><strong>Valor:</strong> ${formatCurrency(sale.total)}</p>
         ` : `
           <p style="color: var(--color-warning);">Estado actual: <strong>${prod.estado.toUpperCase()}</strong></p>

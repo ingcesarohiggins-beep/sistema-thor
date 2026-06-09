@@ -14,8 +14,8 @@ const SCHEMAS = {
   proveedores: ['id', 'nombre', 'telefono', 'email'],
   clientes: ['id', 'nombre', 'documento', 'telefono'],
   lotes: ['id', 'nombre', 'proveedorId', 'flete', 'fecha'],
-  productos: ['id', 'loteId', 'tipo', 'modelo', 'tipoCodigo', 'codigo', 'costoBase', 'costoReal', 'precioSugerido', 'precioVenta', 'stock', 'estado', 'foto'],
-  ventas: ['id', 'clienteId', 'vendedorId', 'fecha', 'total', 'articulos', 'metodoPago'],
+  productos: ['id', 'loteId', 'tipo', 'modelo', 'color', 'tipoCodigo', 'codigo', 'costoBase', 'costoReal', 'precioSugerido', 'precioVenta', 'stock', 'estado', 'foto'],
+  ventas: ['id', 'clienteId', 'vendedorId', 'fecha', 'total', 'articulos', 'metodoPago', 'referencia'],
   egresos: ['id', 'descripcion', 'monto', 'fecha', 'vendedorId'],
   modelos: ['id', 'marca', 'modelo', 'tipo']
 };
@@ -230,13 +230,15 @@ function handleReset() {
 
   // 6. Generar Productos y Stock Iniciales Solicitados
   var rawProducts = [];
+  var phoneColors = ['Negro', 'Blanco', 'Dorado', 'Titanio Natural', 'Azul', 'Plata'];
+  var macColors = ['Gris Espacial', 'Plata', 'Negro Espacial'];
   
   // Accesorios (stock 40-60)
   var chargersStock = Math.floor(Math.random() * 21) + 40;
   var cablesStock = Math.floor(Math.random() * 21) + 40;
   
-  rawProducts.push({ id: 'prod-char', loteId: 'l-thor-1', tipo: 'Cargador', modelo: 'Cargador Rápido Tipo-C 20W', tipoCodigo: 'ninguno', codigo: '', costoBase: 60000, stock: chargersStock, estado: 'disponible', foto: '' });
-  rawProducts.push({ id: 'prod-cable', loteId: 'l-thor-2', tipo: 'Cable', modelo: 'Cable USB-C a Lightning 1m', tipoCodigo: 'ninguno', codigo: '', costoBase: 30000, stock: cablesStock, estado: 'disponible', foto: '' });
+  rawProducts.push({ id: 'prod-char', loteId: 'l-thor-1', tipo: 'Cargador', modelo: 'Cargador Rápido Tipo-C 20W', color: '', tipoCodigo: 'ninguno', codigo: '', costoBase: 60000, stock: chargersStock, estado: 'disponible', foto: '' });
+  rawProducts.push({ id: 'prod-cable', loteId: 'l-thor-2', tipo: 'Cable', modelo: 'Cable USB-C a Lightning 1m', color: '', tipoCodigo: 'ninguno', codigo: '', costoBase: 30000, stock: cablesStock, estado: 'disponible', foto: '' });
 
   // Celulares (stock 5-15, precios de mercado realistas)
   var phoneList = [
@@ -271,6 +273,7 @@ function handleReset() {
     for (var s = 0; s < stock; s++) {
       var prodId = 'prod-c-' + pCounter;
       var imei = (imeiBase + pCounter).toString();
+      var color = phoneColors[s % phoneColors.length];
       // Distribuir de forma equitativa entre los 10 lotes
       var loteIdx = (pCounter % 10) + 1;
       var loteId = 'l-thor-' + loteIdx;
@@ -280,6 +283,7 @@ function handleReset() {
         loteId: loteId,
         tipo: 'Celular',
         modelo: p.name,
+        color: color,
         tipoCodigo: 'imei',
         codigo: imei,
         costoBase: p.cost,
@@ -304,6 +308,7 @@ function handleReset() {
     for (var s = 0; s < stock; s++) {
       var prodId = 'prod-m-' + mCounter;
       var serial = 'SN-MBP-' + (10000 + mCounter);
+      var color = macColors[s % macColors.length];
       // Distribuir de forma equitativa entre los 10 lotes
       var loteIdx = (mCounter % 10) + 1;
       var loteId = 'l-thor-' + loteIdx;
@@ -313,6 +318,7 @@ function handleReset() {
         loteId: loteId,
         tipo: 'Laptop',
         modelo: m.name,
+        color: color,
         tipoCodigo: 'serial',
         codigo: serial,
         costoBase: m.cost,
@@ -356,6 +362,7 @@ function handleReset() {
       p.loteId,
       p.tipo,
       p.modelo,
+      p.color || '',
       p.tipoCodigo,
       p.codigo,
       p.costoBase,
@@ -411,6 +418,13 @@ function checkAndCreateSheets() {
       sheet = ss.insertSheet(sheetName);
       sheet.appendRow(SCHEMAS[sheetName]);
       sheet.getRange(1, 1, 1, SCHEMAS[sheetName].length).setFontWeight("bold");
+    } else {
+      var data = sheet.getDataRange().getValues();
+      var existingHeaders = data[0] || [];
+      var targetHeaders = SCHEMAS[sheetName];
+      if (existingHeaders.length < targetHeaders.length) {
+        sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]).setFontWeight("bold");
+      }
     }
   }
 }

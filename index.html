@@ -256,14 +256,23 @@
               <!-- Método de Pago -->
               <div class="form-group">
                 <label for="sales-payment-method">Método de Pago</label>
-                <select id="sales-payment-method">
+                <select id="sales-payment-method" onchange="togglePaymentRefField()">
                   <option value="efectivo">Efectivo</option>
+                  <option value="yape">Yape</option>
+                  <option value="plin">Plin</option>
                   <option value="transferencia">Transferencia Bancaria</option>
+                  <option value="tarjeta">Pago con Tarjeta</option>
                 </select>
               </div>
 
+              <!-- Referencia de Pago -->
+              <div class="form-group" id="group-payment-ref" style="display: none;">
+                <label for="sales-payment-ref">Referencia / Código de Operación</label>
+                <input type="text" id="sales-payment-ref" placeholder="Ej: N° Operación" class="form-control">
+              </div>
+
               <!-- Botón Confirmar -->
-              <button class="btn btn-success" style="width: 100%; margin-top: auto; padding: 14px;" onclick="processSale()">
+              <button id="btn-confirm-sale" class="btn btn-success" style="width: 100%; margin-top: auto; padding: 14px;" onclick="processSale()">
                 <i class="fa-solid fa-file-pdf"></i> Confirmar Venta e Imprimir PDF
               </button>
             </div>
@@ -682,6 +691,14 @@
             <div class="form-group">
               <label for="prod-modelo">Descripción / Nombre del Equipo</label>
               <input type="text" id="prod-modelo" class="form-control" placeholder="Ej. Samsung S24 256GB / Cargador OEM 20W" required>
+            </div>
+          </div>
+
+          <!-- Color del Producto (Condicional Celulares / Laptops) -->
+          <div class="form-row" id="prod-color-wrapper" style="display: none;">
+            <div class="form-group">
+              <label for="prod-color">Color</label>
+              <input type="text" id="prod-color" class="form-control" placeholder="Ej. Titanio Natural, Space Gray, Blanco, etc.">
             </div>
           </div>
 

@@ -459,6 +459,7 @@ const DB = {
       loteId: prodOriginal.loteId,
       tipo: prodOriginal.tipo,
       modelo: prodOriginal.modelo,
+      color: prodOriginal.color || '',
       tipoCodigo: prodOriginal.tipoCodigo,
       codigo: nuevoImei,
       costoBase: prodOriginal.costoBase,

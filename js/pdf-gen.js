@@ -86,7 +86,8 @@ const PDFGen = {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.text(`Vendedor: ${vendedor.nombre}`, 120, y + 5);
-    doc.text(`Método de Pago: ${venta.metodoPago.toUpperCase()}`, 120, y + 10);
+    const refStr = venta.referencia ? ` (REF: ${venta.referencia})` : '';
+    doc.text(`Método de Pago: ${venta.metodoPago.toUpperCase()}${refStr}`, 120, y + 10);
     doc.text(`Estado: ENTREGADO`, 120, y + 15);
     
     y += 25;
@@ -120,8 +121,8 @@ const PDFGen = {
       }
       isAlt = !isAlt;
 
-      const desc = art.modelo;
-      const cod = art.imei || 'Sin código (Accesorios)';
+      const desc = (art.modelo || '').toString();
+      const cod = (art.imei || 'Sin código (Accesorios)').toString();
       const cant = art.cantidad || 1;
       const precioUnit = art.precioVenta;
       const subtotal = precioUnit * cant;
