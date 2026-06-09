@@ -125,7 +125,7 @@ const DB = {
   async syncAll() {
     if (!this.apiURL) return false;
     try {
-      const res = await fetch(`${this.apiURL}?action=getAll`, { method: 'GET' });
+      const res = await fetch(`${this.apiURL}?action=getAll&_=${Date.now()}`, { method: 'GET' });
       const json = await res.json();
       if (json.status === 'success') {
         this.cache = json.data;
@@ -186,7 +186,7 @@ const DB = {
     }
 
     // Volver a descargar todo ya inicializado
-    const res = await fetch(`${this.apiURL}?action=getAll`, { method: 'GET' });
+    const res = await fetch(`${this.apiURL}?action=getAll&_=${Date.now()}`, { method: 'GET' });
     const json = await res.json();
     if (json.status === 'success') {
       this.cache = json.data;
@@ -204,7 +204,7 @@ const DB = {
     }
 
     try {
-      const res = await fetch(`${url}?action=getAll`, { method: 'GET' });
+      const res = await fetch(`${url}?action=getAll&_=${Date.now()}`, { method: 'GET' });
       const json = await res.json();
       if (json.status === 'success') {
         localStorage.setItem('cel_google_sheet_url', url);

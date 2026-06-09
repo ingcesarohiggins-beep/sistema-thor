@@ -380,9 +380,9 @@ function searchProductForSales() {
 
   const products = DB.getProductos().filter(p => p.estado === 'disponible');
   const filtered = products.filter(p => {
-    return p.modelo.toLowerCase().includes(q) || 
-           (p.codigo && p.codigo.toLowerCase().includes(q)) ||
-           p.tipo.toLowerCase().includes(q);
+    return (p.modelo || '').toLowerCase().includes(q) || 
+           (p.codigo && p.codigo.toString().toLowerCase().includes(q)) ||
+           (p.tipo || '').toLowerCase().includes(q);
   });
 
   if (filtered.length === 0) {
@@ -647,8 +647,8 @@ function renderInventory() {
   const filteredProducts = products.filter(p => {
     const batch = lotes.find(l => l.id === p.loteId);
     const batchName = batch ? batch.nombre.toLowerCase() : '';
-    const matchesSearch = p.modelo.toLowerCase().includes(q) || 
-                          (p.codigo && p.codigo.toLowerCase().includes(q)) || 
+    const matchesSearch = (p.modelo || '').toLowerCase().includes(q) || 
+                          (p.codigo && p.codigo.toString().toLowerCase().includes(q)) || 
                           batchName.includes(q);
     const matchesType = !filterType || p.tipo === filterType;
     const matchesStatus = !filterStatus || p.estado === filterStatus;
