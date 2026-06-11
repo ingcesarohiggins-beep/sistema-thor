@@ -1194,12 +1194,14 @@ function openEditProductModal(id) {
 }
 
 async function deleteProduct(id) {
-  if (confirm("¿Está seguro de eliminar este producto del inventario? Esto recalculará el flete del lote.")) {
-    try {
-      await DB.deleteProduct(id);
-      renderInventory();
-    } catch (e) {
-      alert("Error al eliminar.");
+  if (confirm("¿Está seguro de que desea eliminar este producto del almacén?")) {
+    if (confirm("¡ATENCIÓN! Esta acción es irreversible y se eliminará el producto permanentemente de la base de datos de Google Sheets. ¿Realmente desea confirmar la eliminación definitiva?")) {
+      try {
+        await DB.deleteProduct(id);
+        renderInventory();
+      } catch (e) {
+        alert("Error al eliminar el producto.");
+      }
     }
   }
 }
@@ -1301,7 +1303,7 @@ async function submitProductBaja(event) {
   try {
     const success = await DB.registrarBajaBurocratica(prodId, motivo, justificacion, bajaPhotoBase64, currentUser.id);
     if (success) {
-      alert("Acta de baja registrada con éxito. Se generó un egreso por pérdida contable.");
+      alert("Acta de baja registrada con éxito.");
       closeModal('modal-baja');
       stopCameraStreamForBaja();
       renderInventory();

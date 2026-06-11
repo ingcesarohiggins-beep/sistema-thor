@@ -45,6 +45,8 @@ const DB = {
         console.warn("Fallo al conectar con Google Sheets. Iniciando en Modo Demo.");
         this.isDemoMode = true;
         this.initLocalDemo();
+      } else {
+        await this.autoHealProducts();
       }
     } else {
       this.isDemoMode = true;
@@ -490,6 +492,66 @@ const DB = {
       egresos: egresosDia,
       ventas: ventasDia
     };
+  },
+
+  // Autocorrección de datos desalineados en Sheets
+  async autoHealProducts() {
+    const products = this.getCollection('productos');
+    let updatedAny = false;
+
+    for (let p of products) {
+      // Caso 1: Desalineado leve (color es 'imei' y tipoCodigo es un número (IMEI))
+      if (p.color === 'imei' && typeof p.tipoCodigo === 'number') {
+        const correctImei = p.tipoCodigo;
+        const correctCostoBase = parseFloat(p.codigo) || 0;
+        const correctCostoReal = parseFloat(p.costoBase) || 0;
+        const correctPrecioSugerido = parseFloat(p.costoReal) || 0;
+        const correctPrecioVenta = parseFloat(p.precioSugerido) || 0;
+        const correctStock = parseInt(p.precioVenta) || 1;
+        const correctEstado = p.stock || 'disponible';
+
+        p.color = '';
+        p.tipoCodigo = 'imei';
+        p.codigo = correctImei.toString();
+        p.costoBase = correctCostoBase;
+        p.costoReal = correctCostoReal;
+        p.precioSugerido = correctPrecioSugerido;
+        p.precioVenta = correctPrecioVenta;
+        p.stock = correctStock;
+        p.estado = correctEstado;
+        
+        await this.saveRow('productos', p);
+        updatedAny = true;
+      }
+      // Caso 2: Desalineado severo (color es un número (IMEI) y tipoCodigo es un número (Costo))
+      else if (typeof p.color === 'number' && typeof p.tipoCodigo === 'number') {
+        const correctImei = p.color;
+        const correctCostoBase = p.tipoCodigo;
+        const correctCostoReal = parseFloat(p.codigo) || 0;
+        const correctPrecioSugerido = parseFloat(p.costoBase) || 0;
+        const correctPrecioVenta = parseFloat(p.precioSugerido) || 0;
+        const correctStock = parseInt(p.precioVenta) || 1;
+        const correctEstado = p.stock || 'disponible';
+
+        p.color = '';
+        p.tipoCodigo = 'imei';
+        p.codigo = correctImei.toString();
+        p.costoBase = correctCostoBase;
+        p.costoReal = correctCostoReal;
+        p.precioSugerido = correctPrecioSugerido;
+        p.precioVenta = correctPrecioVenta;
+        p.stock = correctStock;
+        p.estado = correctEstado;
+
+        await this.saveRow('productos', p);
+        updatedAny = true;
+      }
+    }
+
+    if (updatedAny) {
+      console.log("¡Base de datos sanada y sincronizada!");
+      await this.syncAll();
+    }
   },
 
   getValuedInventory() {
