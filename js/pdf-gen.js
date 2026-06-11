@@ -37,28 +37,27 @@ const PDFGen = {
     doc.setFontSize(22);
     doc.setTextColor(...primaryColor);
     doc.text("RECIBO DE CONTROL INTERNO", margin, y);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...secondaryColor);
-    doc.text(`N° Recibo: ${venta.id}`, pageWidth - margin, y, { align: 'right' });
-    y += 7;
+    y += 8;
 
     // Subtítulo del Negocio
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...secondaryColor);
     doc.text("SISTEMA DE CONTROL DE CELULARES & ACCESORIOS", margin, y);
+    y += 8;
     
-    // Fecha y hora
+    // Detalles del documento (N° Recibo en la izquierda, Fecha en la derecha)
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...secondaryColor);
+    doc.text(`N° Recibo: ${venta.id}`, margin, y);
+    
     const fechaFormateada = new Date(venta.fecha).toLocaleString('es-ES', { 
       year: 'numeric', month: 'long', day: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
     doc.text(`Fecha: ${fechaFormateada}`, pageWidth - margin, y, { align: 'right' });
-    y += 15;
+    y += 14;
 
     // --- LÍNEA DIVISORIA ---
     doc.setDrawColor(200, 200, 200);
@@ -101,9 +100,9 @@ const PDFGen = {
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
     doc.text("Producto / Descripción", margin + 2, y + 5.5);
-    doc.text("IMEI / Código / Serial", margin + 70, y + 5.5);
-    doc.text("Cant.", margin + 132, y + 5.5, { align: 'center' });
-    doc.text("Precio Unit.", margin + 162, y + 5.5, { align: 'right' });
+    doc.text("IMEI / Código / Serial", margin + 65, y + 5.5);
+    doc.text("Cant.", margin + 110, y + 5.5, { align: 'center' });
+    doc.text("Precio Unit.", margin + 140, y + 5.5, { align: 'right' });
     doc.text("Subtotal", pageWidth - margin - 2, y + 5.5, { align: 'right' });
     
     y += 8;
@@ -128,9 +127,9 @@ const PDFGen = {
       const subtotal = precioUnit * cant;
 
       doc.text(desc, margin + 2, y + 5.5);
-      doc.text(cod, margin + 70, y + 5.5);
-      doc.text(cant.toString(), margin + 132, y + 5.5, { align: 'center' });
-      doc.text(this.formatCurrency(precioUnit), margin + 162, y + 5.5, { align: 'right' });
+      doc.text(cod, margin + 65, y + 5.5);
+      doc.text(cant.toString(), margin + 110, y + 5.5, { align: 'center' });
+      doc.text(this.formatCurrency(precioUnit), margin + 140, y + 5.5, { align: 'right' });
       doc.text(this.formatCurrency(subtotal), pageWidth - margin - 2, y + 5.5, { align: 'right' });
 
       y += 8;
