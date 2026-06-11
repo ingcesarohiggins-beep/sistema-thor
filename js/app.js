@@ -388,16 +388,19 @@ function searchProductForSales() {
            (p.tipo || '').toLowerCase().includes(q);
   });
 
+  const isAdmin = currentUser && currentUser.rol === 'admin';
+
   if (filtered.length === 0) {
     resultsDiv.innerHTML = `<div style="padding: 12px; color: var(--text-dim); font-size: 13px;">No se encontraron artículos disponibles.</div>`;
   } else {
     resultsDiv.innerHTML = filtered.map(p => {
       const codeLabel = p.tipoCodigo !== 'ninguno' ? ` | ${p.tipoCodigo.toUpperCase()}: ${p.codigo}` : ' | Accesorio';
       const stockLabel = p.tipoCodigo === 'ninguno' ? ` (Stock: ${p.stock})` : '';
+      const costLabel = isAdmin ? ` | Compra: ${formatCurrency(p.costoBase)}` : '';
       return `
         <div onclick="addProductToCartById('${p.id}')" style="padding: 10px 14px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; font-size: 13px;" class="menu-item-hover">
           <div>
-            <strong>[${p.tipo}]</strong> ${p.modelo}${codeLabel}${stockLabel}
+            <strong>[${p.tipo}]</strong> ${p.modelo}${codeLabel}${stockLabel}${costLabel}
           </div>
           <span style="color: var(--color-success); font-weight: bold;">${formatCurrency(p.precioVenta)}</span>
         </div>
@@ -435,6 +438,7 @@ function addProductToCartById(id) {
       imei: prod.codigo,
       precioVenta: prod.precioVenta,
       costoReal: prod.costoReal,
+      costoBase: prod.costoBase,
       tipoCodigo: prod.tipoCodigo,
       maxStock: prod.stock,
       cantidad: 1
@@ -464,9 +468,13 @@ function updateCartUI() {
   list.innerHTML = '';
   let total = 0;
 
+  const isAdmin = currentUser && currentUser.rol === 'admin';
+
   cart.forEach((item, index) => {
     const itemSubtotal = item.precioVenta * item.cantidad;
     total += itemSubtotal;
+
+    const costLabel = isAdmin ? `<span style="font-size: 11px; color: var(--color-accent); display: block; margin-top: 2px;"><i class="fa-solid fa-tags" style="font-size: 10px; margin-right: 4px;"></i>Compra: ${formatCurrency(item.costoBase || item.costoReal)}</span>` : '';
 
     const row = document.createElement('div');
     row.className = 'cart-item';
@@ -474,6 +482,7 @@ function updateCartUI() {
       <div class="cart-item-info">
         <span class="cart-item-name">${item.modelo}</span>
         <span class="cart-item-code">${item.imei ? `IMEI/Cod: ${item.imei}` : 'Accesorio (Sin Código)'}</span>
+        ${costLabel}
       </div>
       <div class="cart-item-actions">
         ${item.tipoCodigo === 'ninguno' ? `
