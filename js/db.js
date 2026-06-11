@@ -11,7 +11,7 @@ const DB = {
   // Inicialización
   async init() {
     // Configurar la URL provista por el usuario como valor predeterminado
-    const defaultUrl = 'https://script.google.com/macros/s/AKfycbwYdWqMSYr99YxFDGKWl-L7rzPhFF1lqtNueS5JQ-rA5gdZXSZhbWU_u4PKH941UDRrMg/exec';
+    const defaultUrl = 'https://script.google.com/macros/s/AKfycbwNuoqtEyxS9JWgeITZ1EXQq3WPXFWhIG4JevEljiLyMeBzyd5j6ZfSmhHNsi9cIyvWfA/exec';
     
     // Limpieza de caché local antigua si existía de sesiones anteriores de pruebas
     const localSellers = JSON.parse(localStorage.getItem('demo_vendedores')) || [];
