@@ -606,6 +606,13 @@ async function processSale() {
 
     // Mostrar modal
     openModal('modal-venta-exitosa');
+
+    // Limpiar carrito y campos de la interfaz inmediatamente
+    clearCart();
+    document.getElementById('sales-payment-ref').value = '';
+    document.getElementById('group-payment-ref').style.display = 'none';
+    document.getElementById('sales-payment-method').value = 'efectivo';
+    document.getElementById('sales-client-select').value = 'c-general';
   } catch (e) {
     alert("Hubo un error al guardar la venta: " + e.message);
   } finally {
@@ -1843,10 +1850,11 @@ function finalizarVentaExitosa() {
   closeModal('modal-venta-exitosa');
   clearCart();
   
-  // Resetear campos de pago
+  // Resetear campos de pago y cliente
   document.getElementById('sales-payment-ref').value = '';
   document.getElementById('group-payment-ref').style.display = 'none';
   document.getElementById('sales-payment-method').value = 'efectivo';
+  document.getElementById('sales-client-select').value = 'c-general';
   
   // Redirigir al inicio
   switchView('dashboard');
