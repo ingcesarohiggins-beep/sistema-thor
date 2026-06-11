@@ -326,7 +326,7 @@
               <h3>📦 Control de Almacén</h3>
               <p style="font-size: 13px; color: var(--text-muted);">Gestiona los lotes de importación y el inventario desglosado.</p>
             </div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="inventory-admin-actions">
               <button class="btn btn-primary" onclick="openNewBatchModal()">
                 <i class="fa-solid fa-circle-plus"></i> Registrar Nuevo Lote
               </button>
@@ -471,7 +471,7 @@
           <div class="dashboard-layout">
             
             <!-- Columna Izquierda: Clientes -->
-            <div class="glass-card">
+            <div class="glass-card" id="contactos-clientes-card">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <h3>👥 Clientes</h3>
                 <button class="btn btn-primary btn-sm" onclick="openNewClientModal()">
@@ -495,7 +495,7 @@
             </div>
 
             <!-- Columna Derecha: Proveedores -->
-            <div class="glass-card">
+            <div class="glass-card" id="contactos-proveedores-card">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <h3>🏢 Proveedores</h3>
                 <button class="btn btn-primary btn-sm" onclick="openNewProviderModal()">
@@ -524,7 +524,7 @@
         <!-- VISTA: HISTORIAL Y REPORTES -->
         <section class="view-pane" id="view-reportes">
           <!-- Tarjetas de Resumen del Reporte -->
-          <div class="metrics-grid">
+          <div class="card-grid">
             <div class="metric-card glass-card">
               <div class="metric-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--color-success);">
                 <i class="fa-solid fa-hand-holding-dollar"></i>
@@ -568,9 +568,31 @@
             
             <!-- Ventas por Vendedor (Resumen del Administrador) -->
             <div id="report-admin-sellers-summary" style="display: none; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 20px;">
-              <h4 style="color: var(--color-gold); margin-bottom: 10px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Resumen por Vendedor</h4>
-              <div style="display: flex; flex-wrap: wrap; gap: 15px;" id="report-sellers-cards-container">
-                <!-- Tarjetas de vendedores dinámicas -->
+              <h4 style="color: var(--color-gold); margin-bottom: 12px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                <i class="fa-solid fa-chart-simple"></i> Resumen de Ventas y Gastos por Vendedor
+              </h4>
+              <div class="table-container" style="margin-bottom: 16px;">
+                <table class="custom-table" style="margin-bottom: 0;">
+                  <thead>
+                    <tr>
+                      <th>Vendedor</th>
+                      <th style="text-align: right;">Total Vendido</th>
+                      <th style="text-align: right;">Total Gastado (Egresos)</th>
+                      <th style="text-align: right;">Neto Generado</th>
+                    </tr>
+                  </thead>
+                  <tbody id="report-sellers-breakdown-body">
+                    <!-- Dinámico -->
+                  </tbody>
+                  <tfoot>
+                    <tr style="background: rgba(191, 161, 95, 0.08); font-weight: bold; border-top: 2px solid var(--color-gold);">
+                      <td style="color: var(--color-gold);">SUMATORIA GENERAL</td>
+                      <td style="text-align: right; color: var(--color-success);" id="report-seller-total-vendido">S/ 0.00</td>
+                      <td style="text-align: right; color: var(--color-danger);" id="report-seller-total-gastado">S/ 0.00</td>
+                      <td style="text-align: right; color: var(--color-gold);" id="report-seller-total-neto">S/ 0.00</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
 

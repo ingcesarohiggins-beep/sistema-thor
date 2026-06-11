@@ -452,14 +452,19 @@ const DB = {
 
   // --- REPORTES Y METRICAS CONTABLES ---
   
-  getDailySummary(dateString) {
+  getDailySummary(dateString, vendedorId = null) {
     const targetDate = dateString || new Date().toISOString().split('T')[0];
     
     const ventas = this.getCollection('ventas');
     const egresos = this.getCollection('egresos');
     
-    const ventasDia = ventas.filter(v => v.fecha.startsWith(targetDate));
-    const egresosDia = egresos.filter(e => e.fecha.startsWith(targetDate));
+    let ventasDia = ventas.filter(v => v.fecha.startsWith(targetDate));
+    let egresosDia = egresos.filter(e => e.fecha.startsWith(targetDate));
+
+    if (vendedorId) {
+      ventasDia = ventasDia.filter(v => v.vendedorId === vendedorId);
+      egresosDia = egresosDia.filter(e => e.vendedorId === vendedorId);
+    }
 
     let totalVendido = 0;
     let costoTotalVendido = 0;

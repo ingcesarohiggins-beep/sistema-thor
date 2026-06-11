@@ -240,7 +240,7 @@ function populateSelectors() {
 
 // --- 1. MÓDULO DASHBOARD / RESUMEN DIARIO ---
 function renderDashboard() {
-  const summary = DB.getDailySummary();
+  const summary = DB.getDailySummary(null, currentUser && currentUser.rol !== 'admin' ? currentUser.id : null);
 
   // Valores numéricos
   document.getElementById('dash-ingresos').textContent = formatCurrency(summary.totalVendido);
@@ -687,6 +687,20 @@ function renderInventory() {
 
   const isAdmin = currentUser && currentUser.rol === 'admin';
 
+  // Ocultar acciones de administración para vendedores
+  const adminActions = document.getElementById('inventory-admin-actions');
+  if (adminActions) {
+    adminActions.style.display = isAdmin ? 'flex' : 'none';
+  }
+
+  const tabLotesButton = document.getElementById('btn-tab-lotes');
+  if (tabLotesButton) {
+    tabLotesButton.style.display = isAdmin ? 'inline-block' : 'none';
+    if (!isAdmin && currentInventoryTab === 'lotes') {
+      switchInventoryTab('productos');
+    }
+  }
+
   const valCards = document.getElementById('inventory-valuation-cards');
   if (isAdmin) {
     valCards.style.display = 'grid';
@@ -736,11 +750,15 @@ function renderInventory() {
 
     const imgSource = p.foto ? `<img src="${p.foto}" style="width: 45px; height: 45px; object-fit: cover; border-radius: 8px;">` : `<i class="fa-solid fa-image" style="font-size: 24px; color: var(--text-dim);"></i>`;
 
-    let actionsHtml = `
-      <button class="btn btn-secondary btn-sm" onclick="openEditProductModal('${p.id}')" title="Editar">
-        <i class="fa-solid fa-pen"></i>
-      </button>
-    `;
+    let actionsHtml = '';
+    
+    if (isAdmin) {
+      actionsHtml += `
+        <button class="btn btn-secondary btn-sm" onclick="openEditProductModal('${p.id}')" title="Editar">
+          <i class="fa-solid fa-pen"></i>
+        </button>
+      `;
+    }
 
     if (p.estado === 'disponible' && p.tipoCodigo !== 'ninguno') {
       actionsHtml += `
@@ -810,13 +828,15 @@ function renderInventory() {
     tr.innerHTML = `
       <td><strong>${l.nombre}</strong></td>
       <td>${prov ? prov.nombre : 'Sin proveedor'}</td>
-      <td style="font-weight: 600;">${formatCurrency(totalCostoLote)}</td>
+      <td style="font-weight: 600;">${isAdmin ? formatCurrency(totalCostoLote) : '***'}</td>
       <td>${l.fecha}</td>
       <td><span class="badge badge-info">${prodLote.length} artículos</span></td>
       <td>
+        ${isAdmin ? `
         <button class="btn btn-secondary btn-sm" onclick="openEditBatchModal('${l.id}')">
           <i class="fa-solid fa-pen"></i> Editar Lote
         </button>
+        ` : ''}
       </td>
     `;
     tbodyLotes.appendChild(tr);
@@ -1535,11 +1555,16 @@ function viewImeiLifecycle(imei) {
 function renderEgresos() {
   const egresos = DB.getEgresos();
   const sellers = DB.getVendedores();
+  const isAdmin = currentUser && currentUser.rol === 'admin';
   
   const tbody = document.getElementById('egresos-table-body');
   tbody.innerHTML = '';
 
-  const egresosHoy = egresos.filter(e => e.fecha === new Date().toISOString().split('T')[0]);
+  let egresosHoy = egresos.filter(e => e.fecha === new Date().toISOString().split('T')[0]);
+
+  if (!isAdmin) {
+    egresosHoy = egresosHoy.filter(e => e.vendedorId === currentUser.id);
+  }
 
   if (egresosHoy.length === 0) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim);">No hay gastos registrados el día de hoy.</td></tr>`;
@@ -1586,6 +1611,16 @@ async function saveEgresoForm(event) {
 }
 
 async function deleteEgreso(id) {
+  const egresos = DB.getEgresos();
+  const egreso = egresos.find(e => e.id === id);
+  if (!egreso) return;
+
+  const isAdmin = currentUser && currentUser.rol === 'admin';
+  if (!isAdmin && egreso.vendedorId !== currentUser.id) {
+    alert("No tiene permisos para eliminar un gasto registrado por otro usuario.");
+    return;
+  }
+
   if (confirm("¿Está seguro de eliminar este gasto de la caja del día?")) {
     try {
       await DB.deleteRow('egresos', id);
@@ -1600,6 +1635,7 @@ async function deleteEgreso(id) {
 function renderContacts() {
   const clients = DB.getClientes();
   const providers = DB.getProveedores();
+  const isAdmin = currentUser && currentUser.rol === 'admin';
 
   const tbodyCli = document.getElementById('clients-table-body');
   tbodyCli.innerHTML = clients.map(c => `
@@ -1610,14 +1646,26 @@ function renderContacts() {
     </tr>
   `).join('');
 
-  const tbodyProv = document.getElementById('providers-table-body');
-  tbodyProv.innerHTML = providers.map(p => `
-    <tr>
-      <td><strong>${p.nombre}</strong></td>
-      <td>${p.telefono}</td>
-      <td>${p.email || '<span style="color: var(--text-dim);">N/A</span>'}</td>
-    </tr>
-  `).join('');
+  const provCard = document.getElementById('contactos-proveedores-card');
+  if (provCard) {
+    provCard.style.display = isAdmin ? 'block' : 'none';
+  }
+
+  const contactsLayout = document.querySelector('#view-contactos .dashboard-layout');
+  if (contactsLayout) {
+    contactsLayout.style.gridTemplateColumns = isAdmin ? '1fr 1fr' : '1fr';
+  }
+
+  if (isAdmin) {
+    const tbodyProv = document.getElementById('providers-table-body');
+    tbodyProv.innerHTML = providers.map(p => `
+      <tr>
+        <td><strong>${p.nombre}</strong></td>
+        <td>${p.telefono}</td>
+        <td>${p.email || '<span style="color: var(--text-dim);">N/A</span>'}</td>
+      </tr>
+    `).join('');
+  }
 }
 
 function openQuickClientModal() { openModal('modal-cliente'); }
@@ -1914,41 +1962,63 @@ async function renderReports() {
     const activeSellersIds = new Set(userSales.map(s => s.vendedorId));
     document.getElementById('report-active-sellers').textContent = activeSellersIds.size;
 
-    // Calcular desglose de ventas por vendedor
-    const sellerSalesMap = {};
+    // Calcular desglose de ventas y egresos por vendedor
+    const sellerPerformanceMap = {};
     sellers.forEach(s => {
-      sellerSalesMap[s.id] = { nombre: s.nombre, total: 0, count: 0 };
+      sellerPerformanceMap[s.id] = { nombre: s.nombre, totalVendido: 0, totalGastado: 0 };
     });
     
-    userSales.forEach(s => {
-      if (sellerSalesMap[s.vendedorId]) {
-        sellerSalesMap[s.vendedorId].total += parseFloat(s.total || 0);
-        sellerSalesMap[s.vendedorId].count += 1;
-      } else {
-        sellerSalesMap[s.vendedorId] = { nombre: `ID: ${s.vendedorId}`, total: parseFloat(s.total || 0), count: 1 };
+    sales.forEach(s => {
+      const vId = s.vendedorId;
+      if (!sellerPerformanceMap[vId]) {
+        sellerPerformanceMap[vId] = { nombre: `Desconocido (ID: ${vId})`, totalVendido: 0, totalGastado: 0 };
       }
+      sellerPerformanceMap[vId].totalVendido += parseFloat(s.total || 0);
     });
 
-    const sellersContainer = document.getElementById('report-sellers-cards-container');
-    sellersContainer.innerHTML = '';
+    const egresos = DB.getEgresos();
+    egresos.forEach(e => {
+      const vId = e.vendedorId;
+      if (!sellerPerformanceMap[vId]) {
+        sellerPerformanceMap[vId] = { nombre: `Desconocido (ID: ${vId})`, totalVendido: 0, totalGastado: 0 };
+      }
+      sellerPerformanceMap[vId].totalGastado += parseFloat(e.monto || 0);
+    });
 
-    Object.keys(sellerSalesMap).forEach(sId => {
-      const data = sellerSalesMap[sId];
-      if (data.count > 0) {
-        const card = document.createElement('div');
-        card.className = 'glass-card';
-        card.style.padding = '12px 16px';
-        card.style.minWidth = '160px';
-        card.style.flex = '1';
-        card.style.border = '1px solid rgba(255, 255, 255, 0.05)';
-        card.innerHTML = `
-          <div style="font-size: 12px; color: var(--color-text-muted); font-weight: 500;">${data.nombre}</div>
-          <div style="font-size: 16px; font-weight: bold; color: var(--color-gold); margin: 4px 0;">${formatCurrency(data.total)}</div>
-          <div style="font-size: 11px; color: var(--color-text-muted);">${data.count} ventas realizadas</div>
+    const breakdownBody = document.getElementById('report-sellers-breakdown-body');
+    breakdownBody.innerHTML = '';
+
+    let grandTotalVendido = 0;
+    let grandTotalGastado = 0;
+    let grandTotalNeto = 0;
+
+    Object.keys(sellerPerformanceMap).forEach(vId => {
+      const data = sellerPerformanceMap[vId];
+      const neto = data.totalVendido - data.totalGastado;
+
+      const hasActivity = data.totalVendido > 0 || data.totalGastado > 0;
+      if (hasActivity || sellers.some(s => s.id === vId)) {
+        grandTotalVendido += data.totalVendido;
+        grandTotalGastado += data.totalGastado;
+        grandTotalNeto += neto;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="font-weight: 500;">${data.nombre}</td>
+          <td style="text-align: right; color: var(--color-success); font-weight: 600;">${formatCurrency(data.totalVendido)}</td>
+          <td style="text-align: right; color: var(--color-danger);">${formatCurrency(data.totalGastado)}</td>
+          <td style="text-align: right; font-weight: 600; color: ${neto >= 0 ? 'var(--color-success)' : 'var(--color-danger)'};">
+            ${formatCurrency(neto)}
+          </td>
         `;
-        sellersContainer.appendChild(card);
+        breakdownBody.appendChild(tr);
       }
     });
+
+    document.getElementById('report-seller-total-vendido').textContent = formatCurrency(grandTotalVendido);
+    document.getElementById('report-seller-total-gastado').textContent = formatCurrency(grandTotalGastado);
+    document.getElementById('report-seller-total-neto').textContent = formatCurrency(grandTotalNeto);
+    document.getElementById('report-seller-total-neto').style.color = grandTotalNeto >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
   }
 
   // Renderizar tabla
