@@ -515,8 +515,8 @@ function updateCartItemPrice(index, value) {
   const price = parseFloat(value) || 0;
   const item = cart[index];
   
-  if (price < item.costoReal) {
-    alert(`Advertencia: El precio de venta no puede ser menor al costo real con flete (${formatCurrency(item.costoReal)}).`);
+  if (price < item.costoBase) {
+    alert(`Advertencia: El precio de venta no puede ser menor al costo de adquisición (${formatCurrency(item.costoBase)}).`);
     updateCartUI();
     return;
   }
@@ -678,6 +678,7 @@ function renderInventory() {
     document.getElementById('val-costo').textContent = formatCurrency(val.inversionTotal);
     document.getElementById('val-venta').textContent = formatCurrency(val.ventaEsperada);
     document.getElementById('val-utilidad').textContent = formatCurrency(val.gananciaEsperada);
+    document.getElementById('val-bajas').textContent = `${val.totalBajas} uds (${formatCurrency(val.inversionBajas)})`;
   } else {
     valCards.style.display = 'none';
   }
@@ -764,8 +765,6 @@ function renderInventory() {
         }
       </td>
       <td>${costBaseField}</td>
-      <td>${fleteProrrateadoField}</td>
-      <td style="font-weight: 500;">${costRealField}</td>
       <td>${suggestedField}</td>
       <td style="font-weight: 600; color: var(--color-success);">${formatCurrency(p.precioVenta)}</td>
       <td>${stockStatusText}</td>
@@ -790,13 +789,11 @@ function renderInventory() {
       const qty = p.tipoCodigo === 'ninguno' ? p.stock : 1;
       totalCostoLote += p.costoBase * qty;
     });
-    totalCostoLote += l.flete;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${l.nombre}</strong></td>
       <td>${prov ? prov.nombre : 'Sin proveedor'}</td>
-      <td>${formatCurrency(l.flete)}</td>
       <td style="font-weight: 600;">${formatCurrency(totalCostoLote)}</td>
       <td>${l.fecha}</td>
       <td><span class="badge badge-info">${prodLote.length} artículos</span></td>
@@ -1022,21 +1019,9 @@ function calculateSuggestedPriceFromForm() {
   const products = DB.getProductos();
   const productsInBatch = products.filter(p => p.loteId === loteId);
 
-  let totalCostoBase = costoBase;
-  productsInBatch.forEach(p => {
-    const qty = p.tipoCodigo === 'ninguno' ? p.stock : 1;
-    totalCostoBase += p.costoBase * qty;
-  });
+  const sugerido = costoBase * 1.20;
 
-  let fleteEstimado = 0;
-  if (totalCostoBase > 0) {
-    fleteEstimado = (costoBase / totalCostoBase) * lote.flete;
-  }
-
-  const costoReal = costoBase + fleteEstimado;
-  const sugerido = costoReal * 1.20;
-
-  document.getElementById('prod-flete-prorrateado').value = formatCurrency(fleteEstimado);
+  document.getElementById('prod-flete-prorrateado').value = formatCurrency(0);
   document.getElementById('prod-precio-sugerido').value = formatCurrency(sugerido);
   
   const finalPriceInput = document.getElementById('prod-precio-venta');
@@ -1130,20 +1115,8 @@ async function saveProductoForm(event) {
   const products = DB.getProductos();
   const productsInBatch = products.filter(p => p.loteId === loteId && p.id !== id);
 
-  let totalCostoBase = costoBase;
-  productsInBatch.forEach(p => {
-    const qty = p.tipoCodigo === 'ninguno' ? p.stock : 1;
-    totalCostoBase += p.costoBase * qty;
-  });
-
-  let fleteEstimado = 0;
-  if (totalCostoBase > 0 && lote) {
-    fleteEstimado = (costoBase / totalCostoBase) * lote.flete;
-  }
-  const costoRealEstimado = costoBase + fleteEstimado;
-
-  if (precioVenta < costoRealEstimado) {
-    alert(`Error: El precio de venta ($${precioVenta}) no puede ser menor al costo real estimado ($${Math.round(costoRealEstimado)}) (Costo Base + Flete).`);
+  if (precioVenta < costoBase) {
+    alert(`Error: El precio de venta (S/ ${precioVenta}) no puede ser menor al costo de adquisición (S/ ${costoBase}).`);
     return;
   }
 

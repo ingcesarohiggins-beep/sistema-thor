@@ -308,9 +308,16 @@
             <div class="glass-card metric-card" style="background: rgba(14, 165, 233, 0.12);">
               <div class="metric-info">
                 <span class="metric-label" style="color: var(--text-main); font-size: 11px;">Utilidad Proyectada</span>
-                <span class="metric-value" id="val-utilidad" style="font-size: 24px;">$0</span>
+                <span class="metric-value" id="val-utilidad" style="font-size: 24px;">S/ 0</span>
               </div>
               <div class="metric-icon"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+            </div>
+            <div class="glass-card metric-card" style="background: rgba(239, 68, 68, 0.12);">
+              <div class="metric-info">
+                <span class="metric-label" style="color: var(--text-main); font-size: 11px;">Equipos de Baja (Pérdidas)</span>
+                <span class="metric-value" id="val-bajas" style="font-size: 24px;">0</span>
+              </div>
+              <div class="metric-icon red" style="color: var(--color-danger);"><i class="fa-solid fa-circle-minus"></i></div>
             </div>
           </div>
 
@@ -379,9 +386,7 @@
                     <th>Modelo / Nombre</th>
                     <th>Lote Origen</th>
                     <th>IMEI / Código / Serial</th>
-                    <th>Costo Base</th>
-                    <th>Flete Prorrateado</th>
-                    <th>Costo Real</th>
+                    <th>Costo Adquisición</th>
                     <th>Precio Sugerido (+20%)</th>
                     <th>Precio Venta</th>
                     <th>Stock / Estado</th>
@@ -401,7 +406,6 @@
                   <tr>
                     <th>Nombre Lote</th>
                     <th>Proveedor</th>
-                    <th>Flete Total</th>
                     <th>Costo Total Lote</th>
                     <th>Fecha Ingreso</th>
                     <th>Items Registrados</th>
@@ -711,9 +715,9 @@
                 <!-- Dinámico -->
               </select>
             </div>
-            <div class="form-group">
-              <label for="lote-flete">Costo del Flete ($)</label>
-              <input type="number" id="lote-flete" class="form-control" placeholder="Flete del lote completo" required min="0">
+            <div class="form-group" style="display: none;">
+              <label for="lote-flete">Costo del Flete</label>
+              <input type="number" id="lote-flete" class="form-control" value="0">
             </div>
           </div>
         </div>
@@ -811,12 +815,12 @@
           <!-- Precios y Costos -->
           <div class="form-row">
             <div class="form-group">
-              <label for="prod-costo-base">Costo de Compra Base ($)</label>
-              <input type="number" id="prod-costo-base" class="form-control" placeholder="Costo sin flete" oninput="calculateSuggestedPriceFromForm()" required min="0">
+              <label for="prod-costo-base">Costo de Compra (S/)</label>
+              <input type="number" id="prod-costo-base" class="form-control" placeholder="Costo de compra unitario" oninput="calculateSuggestedPriceFromForm()" required min="0">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="display: none;">
               <label>Flete Prorrateado (Auto)</label>
-              <input type="text" id="prod-flete-prorrateado" class="form-control" disabled value="$0">
+              <input type="text" id="prod-flete-prorrateado" class="form-control" disabled value="0">
             </div>
           </div>
 

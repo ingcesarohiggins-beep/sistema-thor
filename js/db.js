@@ -347,7 +347,7 @@ const DB = {
 
   // --- OPERACIONES COMPUESTAS Y PRORRATEOS ---
 
-  // Recalcular prorrateo de flete en todos los productos de un lote
+  // Recalcular costo real en todos los productos de un lote (flete desactivado)
   async recalcularProrrateoLote(loteId) {
     if (!loteId) return;
     const lotes = this.getCollection('lotes');
@@ -358,33 +358,15 @@ const DB = {
     const productosDelLote = productos.filter(p => p.loteId === loteId);
     if (productosDelLote.length === 0) return;
 
-    // Calcular el costo base total del lote de productos activos (disponibles o bajas)
-    let totalCostoBase = 0;
-    productosDelLote.forEach(p => {
-      const qty = p.tipoCodigo === 'ninguno' ? (parseInt(p.stock) || 1) : 1;
-      totalCostoBase += parseFloat(p.costoBase) * qty;
-    });
-
-    const fleteTotal = parseFloat(lote.flete) || 0;
-
-    // Guardar secuencialmente para evitar concurrencias
     for (let p of productos) {
       if (p.loteId === loteId) {
-        let fleteProrrateado = 0;
-        if (totalCostoBase > 0) {
-          fleteProrrateado = (parseFloat(p.costoBase) / totalCostoBase) * fleteTotal;
-        } else {
-          fleteProrrateado = fleteTotal / productosDelLote.length;
-        }
-
-        p.costoReal = parseFloat(p.costoBase) + fleteProrrateado;
+        p.costoReal = parseFloat(p.costoBase);
         p.precioSugerido = p.costoReal * 1.20; // Utilidad del 20%
         
         if (!p.precioVenta || p.precioVenta < p.costoReal) {
           p.precioVenta = p.precioSugerido;
         }
 
-        // Guardar cambios en el producto
         await this.saveRow('productos', p);
       }
     }
@@ -426,15 +408,6 @@ const DB = {
     };
     await this.saveRow('productos', prod);
 
-    const egreso = {
-      id: null,
-      descripcion: `[BAJA:${prod.id}] - ${prod.modelo} (${prod.codigo || 'Sin código'}) - Motivo: ${motivo}`,
-      monto: prod.costoReal,
-      fecha: new Date().toISOString().split('T')[0],
-      vendedorId: vendedorId
-    };
-    await this.saveRow('egresos', egreso);
-
     return true;
   },
 
@@ -471,19 +444,6 @@ const DB = {
       foto: nuevaFotoBase64 || prodOriginal.foto
     };
     await this.saveRow('productos', nuevoProd);
-
-    const egresos = this.getCollection('egresos');
-    const egresoOriginal = egresos.find(e => e.descripcion.includes(`[BAJA:${prodOriginal.id}]`));
-    
-    if (egresoOriginal) {
-      if (this.isDemoMode) {
-        await this.deleteRow('egresos', egresoOriginal.id);
-      } else {
-        egresoOriginal.monto = 0;
-        egresoOriginal.descripcion = `[REEMPLAZADO] ${egresoOriginal.descripcion}`;
-        await this.saveRow('egresos', egresoOriginal);
-      }
-    }
 
     return true;
   },
@@ -533,15 +493,23 @@ const DB = {
   },
 
   getValuedInventory() {
-    const productos = this.getCollection('productos').filter(p => p.estado === 'disponible');
-    
+    const todosProductos = this.getCollection('productos');
+    const disponibles = todosProductos.filter(p => p.estado === 'disponible');
+    const bajas = todosProductos.filter(p => p.estado === 'baja');
+
     let inversionTotal = 0;
     let ventaEsperada = 0;
 
-    productos.forEach(p => {
+    disponibles.forEach(p => {
       const qty = p.tipoCodigo === 'ninguno' ? p.stock : 1;
       inversionTotal += p.costoReal * qty;
       ventaEsperada += p.precioVenta * qty;
+    });
+
+    let inversionBajas = 0;
+    bajas.forEach(p => {
+      const qty = p.tipoCodigo === 'ninguno' ? p.stock : 1;
+      inversionBajas += p.costoBase * qty;
     });
 
     const gananciaEsperada = ventaEsperada - inversionTotal;
@@ -550,7 +518,9 @@ const DB = {
       inversionTotal,
       ventaEsperada,
       gananciaEsperada,
-      totalArticulos: productos.length
+      totalArticulos: disponibles.length,
+      inversionBajas,
+      totalBajas: bajas.length
     };
   },
 
