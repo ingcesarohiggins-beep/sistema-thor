@@ -94,6 +94,7 @@ async function switchView(viewId) {
     'inventario': 'Almacén y Lotes',
     'egresos': 'Control de Gastos / Egresos',
     'contactos': 'Clientes & Proveedores',
+    'reportes': 'Historial y Reportes',
     'admin': 'Panel de Administración'
   };
   document.getElementById('view-title').textContent = titleMap[viewId] || 'Panel de Control';
@@ -115,6 +116,8 @@ async function switchView(viewId) {
     renderEgresos();
   } else if (viewId === 'contactos') {
     renderContacts();
+  } else if (viewId === 'reportes') {
+    renderReports();
   } else if (viewId === 'admin') {
     renderAdminPanel();
   }
@@ -586,16 +589,23 @@ async function processSale() {
 
   try {
     const ventaGuardada = await DB.registrarVentaCompleta(nuevaVenta);
-    PDFGen.generateReceipt(ventaGuardada, cliente, currentUser);
-    alert("Venta procesada con éxito y recibo PDF generado.");
-    clearCart();
     
-    // Reset payment ref elements
-    document.getElementById('sales-payment-ref').value = '';
-    document.getElementById('group-payment-ref').style.display = 'none';
-    document.getElementById('sales-payment-method').value = 'efectivo';
-    
-    await switchView('dashboard');
+    // Guardar referencias globales para la descarga del PDF
+    ultimaVentaGuardada = ventaGuardada;
+    ultimoClienteGuardado = cliente;
+
+    // Actualizar campos en el modal de éxito
+    document.getElementById('success-sale-id').textContent = ventaGuardada.id;
+    document.getElementById('success-sale-cliente').textContent = cliente.nombre;
+    document.getElementById('success-sale-total').textContent = formatCurrency(ventaGuardada.total);
+
+    // Asignar el evento para descargar el PDF
+    document.getElementById('btn-success-pdf').onclick = function() {
+      PDFGen.generateReceipt(ventaGuardada, cliente, currentUser);
+    };
+
+    // Mostrar modal
+    openModal('modal-venta-exitosa');
   } catch (e) {
     alert("Hubo un error al guardar la venta: " + e.message);
   } finally {
@@ -1844,8 +1854,266 @@ function importDatabaseFromFile(event) {
 
 // --- UTILIDADES ---
 function formatCurrency(value) {
-  return '$' + parseFloat(value).toLocaleString('es-CO', {
+  return 'S/ ' + parseFloat(value).toLocaleString('es-PE', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    maximumFractionDigits: 2
   });
+}
+
+// Variables para control del comprobante post-venta
+let ultimaVentaGuardada = null;
+let ultimoClienteGuardado = null;
+
+function finalizarVentaExitosa() {
+  closeModal('modal-venta-exitosa');
+  clearCart();
+  
+  // Resetear campos de pago
+  document.getElementById('sales-payment-ref').value = '';
+  document.getElementById('group-payment-ref').style.display = 'none';
+  document.getElementById('sales-payment-method').value = 'efectivo';
+  
+  // Redirigir al inicio
+  switchView('dashboard');
+}
+
+// --- MÓDULO DE REPORTES E HISTORIAL ---
+let allSalesList = [];
+
+async function renderReports() {
+  if (!DB.isDemoMode) {
+    await DB.syncAll();
+  }
+  
+  const sales = DB.getVentas();
+  const sellers = DB.getVendedores();
+  const clients = DB.getClientes();
+  const isAdmin = currentUser && currentUser.rol === 'admin';
+
+  // Filtrar según rol
+  let userSales = [];
+  if (isAdmin) {
+    userSales = sales;
+    // Mostrar bloques de administrador
+    document.getElementById('report-admin-card-sellers').style.display = 'flex';
+    document.getElementById('report-admin-sellers-summary').style.display = 'block';
+    document.getElementById('report-th-vendedor').style.display = 'table-cell';
+    document.getElementById('report-title-text').textContent = '📋 Historial General de Ventas (Administrador)';
+  } else {
+    userSales = sales.filter(s => s.vendedorId === currentUser.id);
+    // Ocultar bloques de administrador
+    document.getElementById('report-admin-card-sellers').style.display = 'none';
+    document.getElementById('report-admin-sellers-summary').style.display = 'none';
+    document.getElementById('report-th-vendedor').style.display = 'none';
+    document.getElementById('report-title-text').textContent = '📋 Mis Ventas Registradas';
+  }
+
+  // Ordenar de más reciente a más antiguo
+  userSales.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  allSalesList = userSales;
+
+  // Calcular métricas
+  const totalRevenue = userSales.reduce((sum, s) => sum + parseFloat(s.total || 0), 0);
+  document.getElementById('report-total-revenue').textContent = formatCurrency(totalRevenue);
+  document.getElementById('report-total-sales').textContent = userSales.length;
+
+  if (isAdmin) {
+    // Calcular vendedores activos
+    const activeSellersIds = new Set(userSales.map(s => s.vendedorId));
+    document.getElementById('report-active-sellers').textContent = activeSellersIds.size;
+
+    // Calcular desglose de ventas por vendedor
+    const sellerSalesMap = {};
+    sellers.forEach(s => {
+      sellerSalesMap[s.id] = { nombre: s.nombre, total: 0, count: 0 };
+    });
+    
+    userSales.forEach(s => {
+      if (sellerSalesMap[s.vendedorId]) {
+        sellerSalesMap[s.vendedorId].total += parseFloat(s.total || 0);
+        sellerSalesMap[s.vendedorId].count += 1;
+      } else {
+        sellerSalesMap[s.vendedorId] = { nombre: `ID: ${s.vendedorId}`, total: parseFloat(s.total || 0), count: 1 };
+      }
+    });
+
+    const sellersContainer = document.getElementById('report-sellers-cards-container');
+    sellersContainer.innerHTML = '';
+
+    Object.keys(sellerSalesMap).forEach(sId => {
+      const data = sellerSalesMap[sId];
+      if (data.count > 0) {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        card.style.padding = '12px 16px';
+        card.style.minWidth = '160px';
+        card.style.flex = '1';
+        card.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+        card.innerHTML = `
+          <div style="font-size: 12px; color: var(--color-text-muted); font-weight: 500;">${data.nombre}</div>
+          <div style="font-size: 16px; font-weight: bold; color: var(--color-gold); margin: 4px 0;">${formatCurrency(data.total)}</div>
+          <div style="font-size: 11px; color: var(--color-text-muted);">${data.count} ventas realizadas</div>
+        `;
+        sellersContainer.appendChild(card);
+      }
+    });
+  }
+
+  // Renderizar tabla
+  renderReportsTable(userSales);
+}
+
+function renderReportsTable(salesList) {
+  const tbody = document.getElementById('reports-table-body');
+  tbody.innerHTML = '';
+  
+  const sellers = DB.getVendedores();
+  const clients = DB.getClientes();
+  const isAdmin = currentUser && currentUser.rol === 'admin';
+
+  if (salesList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="${isAdmin ? 8 : 7}" style="text-align: center; color: var(--color-text-muted); padding: 20px;">No se encontraron registros de ventas.</td></tr>`;
+    return;
+  }
+
+  salesList.forEach(sale => {
+    const cliente = clients.find(c => c.id === sale.clienteId) || { nombre: 'Cliente General' };
+    const vendedor = sellers.find(v => v.id === sale.vendedorId) || { nombre: `Vendedor (${sale.vendedorId})` };
+
+    const dateStr = new Date(sale.fecha).toLocaleString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    // Detallar artículos
+    let articlesStr = '';
+    let items = [];
+    if (Array.isArray(sale.articulos)) {
+      items = sale.articulos;
+    } else if (typeof sale.articulos === 'string') {
+      try { items = JSON.parse(sale.articulos); } catch(e){}
+    }
+    
+    articlesStr = items.map(art => {
+      const modelName = art.modelo || 'Producto';
+      const detail = art.imei ? ` (${art.imei})` : '';
+      return `${art.cantidad}x ${modelName}${detail}`;
+    }).join(', ');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-family: monospace; font-size: 11px; color: var(--color-text-muted);">${sale.id}</td>
+      <td>${dateStr}</td>
+      <td style="font-weight: 500;">${cliente.nombre}</td>
+      ${isAdmin ? `<td>${vendedor.nombre}</td>` : ''}
+      <td style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${articlesStr}">${articlesStr}</td>
+      <td>
+        <span class="badge" style="background: rgba(255,255,255,0.05); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+          ${sale.metodoPago.toUpperCase()}${sale.referencia ? ` (Ref: ${sale.referencia})` : ''}
+        </span>
+      </td>
+      <td style="text-align: right; font-weight: 600; color: var(--color-success);">${formatCurrency(sale.total)}</td>
+      <td style="text-align: center;">
+        <button class="btn btn-secondary btn-sm" onclick="reprintReceipt('${sale.id}')" style="padding: 4px 8px; font-size: 11px;">
+          <i class="fa-solid fa-file-pdf"></i> PDF
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function filterReportsTable() {
+  const q = document.getElementById('report-search-input').value.trim().toLowerCase();
+  const sellers = DB.getVendedores();
+  const clients = DB.getClientes();
+  const isAdmin = currentUser && currentUser.rol === 'admin';
+
+  if (!q) {
+    renderReportsTable(allSalesList);
+    return;
+  }
+
+  const filtered = allSalesList.filter(sale => {
+    const cliente = clients.find(c => c.id === sale.clienteId) || { nombre: '' };
+    const vendedor = sellers.find(v => v.id === sale.vendedorId) || { nombre: '' };
+    
+    let articlesStr = '';
+    let items = [];
+    if (Array.isArray(sale.articulos)) {
+      items = sale.articulos;
+    } else if (typeof sale.articulos === 'string') {
+      try { items = JSON.parse(sale.articulos); } catch(e){}
+    }
+    articlesStr = items.map(art => (art.modelo || '') + ' ' + (art.imei || '')).join(' ').toLowerCase();
+
+    return (
+      (sale.id || '').toLowerCase().includes(q) ||
+      cliente.nombre.toLowerCase().includes(q) ||
+      (isAdmin && vendedor.nombre.toLowerCase().includes(q)) ||
+      (sale.metodoPago || '').toLowerCase().includes(q) ||
+      (sale.referencia || '').toLowerCase().includes(q) ||
+      articlesStr.includes(q)
+    );
+  });
+
+  renderReportsTable(filtered);
+}
+
+function reprintReceipt(saleId) {
+  const sales = DB.getVentas();
+  const sale = sales.find(s => s.id === saleId);
+  if (!sale) return;
+
+  const clients = DB.getClientes();
+  const cliente = clients.find(c => c.id === sale.clienteId) || { nombre: 'Cliente General', documento: '---', telefono: '---' };
+
+  const sellers = DB.getVendedores();
+  const vendedor = sellers.find(v => v.id === sale.vendedorId) || { nombre: 'Desconocido' };
+
+  PDFGen.generateReceipt(sale, cliente, vendedor);
+}
+
+function exportReportsToCSV() {
+  const csvRows = [];
+  const headers = ['ID de Venta', 'Fecha', 'Cliente', 'Vendedor', 'Articulos', 'Metodo Pago', 'Referencia', 'Total'];
+  csvRows.push(headers.join(','));
+
+  const sellers = DB.getVendedores();
+  const clients = DB.getClientes();
+
+  allSalesList.forEach(sale => {
+    const cliente = clients.find(c => c.id === sale.clienteId) || { nombre: 'Cliente General' };
+    const vendedor = sellers.find(v => v.id === sale.vendedorId) || { nombre: `Vendedor (${sale.vendedorId})` };
+
+    let items = [];
+    if (Array.isArray(sale.articulos)) {
+      items = sale.articulos;
+    } else if (typeof sale.articulos === 'string') {
+      try { items = JSON.parse(sale.articulos); } catch(e){}
+    }
+    const articlesStr = items.map(art => `${art.cantidad}x ${art.modelo}`).join('; ');
+    
+    const row = [
+      `"${sale.id}"`,
+      `"${sale.fecha}"`,
+      `"${cliente.nombre.replace(/"/g, '""')}"`,
+      `"${vendedor.nombre.replace(/"/g, '""')}"`,
+      `"${articlesStr.replace(/"/g, '""')}"`,
+      `"${sale.metodoPago}"`,
+      `"${sale.referencia || ''}"`,
+      sale.total
+    ];
+    csvRows.push(row.join(','));
+  });
+
+  const csvContent = "\ufeff" + csvRows.join("\n"); // \ufeff is BOM for Excel Spanish compatibility
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `reporte_ventas_thor_${new Date().toISOString().split('T')[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }

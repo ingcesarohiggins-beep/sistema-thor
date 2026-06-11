@@ -41,7 +41,7 @@ const PDFGen = {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...secondaryColor);
-    doc.text(`N° Recibo: ${venta.id}`, pageWidth - margin - 60, y, { align: 'right' });
+    doc.text(`N° Recibo: ${venta.id}`, pageWidth - margin, y, { align: 'right' });
     y += 7;
 
     // Subtítulo del Negocio
@@ -57,7 +57,7 @@ const PDFGen = {
     });
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Fecha: ${fechaFormateada}`, pageWidth - margin - 60, y, { align: 'right' });
+    doc.text(`Fecha: ${fechaFormateada}`, pageWidth - margin, y, { align: 'right' });
     y += 15;
 
     // --- LÍNEA DIVISORIA ---
@@ -100,11 +100,11 @@ const PDFGen = {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
-    doc.text("Producto / Descripción", margin + 3, y + 5.5);
-    doc.text("IMEI / Código / Serial", margin + 80, y + 5.5);
-    doc.text("Cant.", margin + 130, y + 5.5);
-    doc.text("Precio Unit.", margin + 150, y + 5.5, { align: 'right' });
-    doc.text("Subtotal", pageWidth - margin - 3, y + 5.5, { align: 'right' });
+    doc.text("Producto / Descripción", margin + 2, y + 5.5);
+    doc.text("IMEI / Código / Serial", margin + 70, y + 5.5);
+    doc.text("Cant.", margin + 132, y + 5.5, { align: 'center' });
+    doc.text("Precio Unit.", margin + 162, y + 5.5, { align: 'right' });
+    doc.text("Subtotal", pageWidth - margin - 2, y + 5.5, { align: 'right' });
     
     y += 8;
     
@@ -127,11 +127,11 @@ const PDFGen = {
       const precioUnit = art.precioVenta;
       const subtotal = precioUnit * cant;
 
-      doc.text(desc, margin + 3, y + 5.5);
-      doc.text(cod, margin + 80, y + 5.5);
-      doc.text(cant.toString(), margin + 130, y + 5.5);
-      doc.text(this.formatCurrency(precioUnit), margin + 150, y + 5.5, { align: 'right' });
-      doc.text(this.formatCurrency(subtotal), pageWidth - margin - 3, y + 5.5, { align: 'right' });
+      doc.text(desc, margin + 2, y + 5.5);
+      doc.text(cod, margin + 70, y + 5.5);
+      doc.text(cant.toString(), margin + 132, y + 5.5, { align: 'center' });
+      doc.text(this.formatCurrency(precioUnit), margin + 162, y + 5.5, { align: 'right' });
+      doc.text(this.formatCurrency(subtotal), pageWidth - margin - 2, y + 5.5, { align: 'right' });
 
       y += 8;
     });
@@ -146,8 +146,8 @@ const PDFGen = {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(...primaryColor);
-    doc.text("TOTAL PAGADO:", pageWidth - margin - 80, y, { align: 'right' });
-    doc.text(this.formatCurrency(venta.total), pageWidth - margin - 3, y, { align: 'right' });
+    doc.text("TOTAL PAGADO:", pageWidth - margin - 40, y, { align: 'right' });
+    doc.text(this.formatCurrency(venta.total), pageWidth - margin - 2, y, { align: 'right' });
 
     y += 20;
 
@@ -177,9 +177,9 @@ const PDFGen = {
 
   // Formatear valor como moneda colombiana/latina (COP/USD)
   formatCurrency(value) {
-    return '$' + parseFloat(value).toLocaleString('es-CO', {
+    return 'S/ ' + parseFloat(value).toLocaleString('es-PE', {
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 2
     });
   }
 };
