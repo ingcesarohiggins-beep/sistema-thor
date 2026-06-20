@@ -52,6 +52,34 @@ const DB = {
     }
   },
 
+  getDefaultColores() {
+    return [
+      { id: 'col-1', nombre: 'Space Gray' },
+      { id: 'col-2', nombre: 'Silver' },
+      { id: 'col-3', nombre: 'Gold' },
+      { id: 'col-4', nombre: 'Midnight' },
+      { id: 'col-5', nombre: 'Starlight' },
+      { id: 'col-6', nombre: 'Negro' },
+      { id: 'col-7', nombre: 'Blanco' },
+      { id: 'col-8', nombre: 'Azul' },
+      { id: 'col-9', nombre: 'Rojo' },
+      { id: 'col-10', nombre: 'Verde' }
+    ];
+  },
+
+  getDefaultCapacidades() {
+    return [
+      { id: 'cap-1', valor: '64GB' },
+      { id: 'cap-2', valor: '128GB' },
+      { id: 'cap-3', valor: '256GB' },
+      { id: 'cap-4', valor: '512GB' },
+      { id: 'cap-5', valor: '1TB' },
+      { id: 'cap-6', valor: '8GB/512GB' },
+      { id: 'cap-7', valor: '18GB/512GB' },
+      { id: 'cap-8', valor: '36GB/1TB' }
+    ];
+  },
+
   // Inicializar base de datos local (Modo Demo / Fallback) con credenciales de Thor y modelos
   initLocalDemo() {
     console.log("Iniciando Modo Demo en LocalStorage...");
@@ -85,12 +113,12 @@ const DB = {
 
       const defaultProducts = [
         { 
-          id: 'prod-1', loteId: 'l-1', tipo: 'Celular', modelo: 'Samsung Galaxy S23 Ultra', 
+          id: 'prod-1', loteId: 'l-1', tipo: 'Celular', modelo: 'Samsung Galaxy S23 Ultra 256GB', 
           tipoCodigo: 'imei', codigo: '358912345678901', costoBase: 3500000, costoReal: 3605000, 
           precioSugerido: 4326000, precioVenta: 4326000, stock: 1, estado: 'disponible', foto: '' 
         },
         { 
-          id: 'prod-2', loteId: 'l-1', tipo: 'Celular', modelo: 'Xiaomi Redmi Note 13 Pro', 
+          id: 'prod-2', loteId: 'l-1', tipo: 'Celular', modelo: 'Xiaomi Redmi Note 13 Pro 128GB', 
           tipoCodigo: 'imei', codigo: '354456789123456', costoBase: 1500000, costoReal: 1545000, 
           precioSugerido: 1854000, precioVenta: 1854000, stock: 1, estado: 'disponible', foto: '' 
         }
@@ -114,8 +142,15 @@ const DB = {
       localStorage.setItem('demo_modelos', JSON.stringify(defaultModels));
     }
 
+    if (!localStorage.getItem('demo_colores')) {
+      localStorage.setItem('demo_colores', JSON.stringify(this.getDefaultColores()));
+    }
+    if (!localStorage.getItem('demo_capacidades')) {
+      localStorage.setItem('demo_capacidades', JSON.stringify(this.getDefaultCapacidades()));
+    }
+
     // Cargar caché desde LocalStorage
-    const tables = ['vendedores', 'proveedores', 'clientes', 'lotes', 'productos', 'ventas', 'egresos', 'modelos'];
+    const tables = ['vendedores', 'proveedores', 'clientes', 'lotes', 'productos', 'ventas', 'egresos', 'modelos', 'colores', 'capacidades'];
     tables.forEach(t => {
       this.cache[t] = JSON.parse(localStorage.getItem('demo_' + t)) || [];
     });
@@ -137,6 +172,25 @@ const DB = {
           return false;
         }
         newCache[tables[i]] = data || [];
+      }
+
+      // Carga resiliente de catálogos (colores y capacidades)
+      try {
+        const { data: colData, error: colErr } = await this.supabase.from('colores').select('*');
+        if (colErr) throw colErr;
+        newCache['colores'] = colData || [];
+      } catch (err) {
+        console.warn("Tabla 'colores' no encontrada en Supabase. Cargando valores por defecto.", err);
+        newCache['colores'] = this.getDefaultColores();
+      }
+
+      try {
+        const { data: capData, error: capErr } = await this.supabase.from('capacidades').select('*');
+        if (capErr) throw capErr;
+        newCache['capacidades'] = capData || [];
+      } catch (err) {
+        console.warn("Tabla 'capacidades' no encontrada en Supabase. Cargando valores por defecto.", err);
+        newCache['capacidades'] = this.getDefaultCapacidades();
       }
       
       this.cache = newCache;
@@ -573,6 +627,8 @@ const DB = {
       localStorage.removeItem('demo_ventas');
       localStorage.removeItem('demo_egresos');
       localStorage.removeItem('demo_modelos');
+      localStorage.removeItem('demo_colores');
+      localStorage.removeItem('demo_capacidades');
       this.initLocalDemo();
       return true;
     } else {
@@ -582,6 +638,14 @@ const DB = {
         for (const table of tablesToDelete) {
           const { error } = await this.supabase.from(table).delete().neq('id', '_dummy_id_');
           if (error) throw error;
+        }
+
+        // Limpiar catálogos opcionales si existen
+        try {
+          await this.supabase.from('colores').delete().neq('id', '_dummy_id_');
+          await this.supabase.from('capacidades').delete().neq('id', '_dummy_id_');
+        } catch (e) {
+          console.warn("No se pudieron limpiar las tablas opcionales de catálogos en Supabase", e);
         }
 
         // Insertar vendedores iniciales
@@ -609,38 +673,37 @@ const DB = {
         const { error: errClients } = await this.supabase.from('clientes').insert(defaultClients);
         if (errClients) throw errClients;
 
-        // Insertar modelos iniciales
+        // Insertar modelos iniciales base
         const defaultModels = [
-          { id: 'm-1', marca: 'Apple', modelo: 'iPhone 11 R 64GB', tipo: 'Celular' },
-          { id: 'm-2', marca: 'Apple', modelo: 'iPhone 13 R 128GB', tipo: 'Celular' },
-          { id: 'm-3', marca: 'Apple', modelo: 'iPhone 14 eSIM 128GB', tipo: 'Celular' },
-          { id: 'm-4', marca: 'Apple', modelo: 'iPhone 14 Chip 128GB', tipo: 'Celular' },
-          { id: 'm-5', marca: 'Apple', modelo: 'iPhone 15 128GB', tipo: 'Celular' },
-          { id: 'm-6', marca: 'Apple', modelo: 'iPhone 15 Pro Max eSIM 256GB', tipo: 'Celular' },
-          { id: 'm-7', marca: 'Apple', modelo: 'iPhone 16 Chip 128GB', tipo: 'Celular' },
-          { id: 'm-8', marca: 'Apple', modelo: 'iPhone 16 Chip 256GB', tipo: 'Celular' },
-          { id: 'm-9', marca: 'Apple', modelo: 'iPhone 16 Plus 128GB', tipo: 'Celular' },
-          { id: 'm-10', marca: 'Apple', modelo: 'iPhone 16 Pro Chip 128GB', tipo: 'Celular' },
-          { id: 'm-11', marca: 'Apple', modelo: 'iPhone 16 Pro Max Chip 256GB', tipo: 'Celular' },
-          { id: 'm-12', marca: 'Apple', modelo: 'iPhone 17 Chip 256GB', tipo: 'Celular' },
-          { id: 'm-13', marca: 'Apple', modelo: 'iPhone 17 eSIM 256GB', tipo: 'Celular' },
-          { id: 'm-14', marca: 'Apple', modelo: 'iPhone 17 Pro eSIM 256GB', tipo: 'Celular' },
-          { id: 'm-15', marca: 'Apple', modelo: 'iPhone 17 Pro Chip 256GB', tipo: 'Celular' },
-          { id: 'm-16', marca: 'Apple', modelo: 'iPhone 17 Pro eSIM 512GB', tipo: 'Celular' },
-          { id: 'm-17', marca: 'Apple', modelo: 'iPhone 17 Pro Chip 1TB', tipo: 'Celular' },
-          { id: 'm-18', marca: 'Apple', modelo: 'iPhone 17 Pro Max eSIM 256GB', tipo: 'Celular' },
-          { id: 'm-19', marca: 'Apple', modelo: 'iPhone 17 Pro Max Chip 256GB', tipo: 'Celular' },
-          { id: 'm-20', marca: 'Apple', modelo: 'iPhone 17 Pro Max eSIM 512GB', tipo: 'Celular' },
-          { id: 'm-21', marca: 'Apple', modelo: 'iPhone 17 Pro Max Chip 512GB', tipo: 'Celular' },
-          { id: 'm-22', marca: 'Apple', modelo: 'iPhone 17 Pro Max eSIM 1TB', tipo: 'Celular' },
-          { id: 'm-23', marca: 'Apple', modelo: 'MacBook Pro 14" M3 (8GB/512GB)', tipo: 'Laptop' },
-          { id: 'm-24', marca: 'Apple', modelo: 'MacBook Pro 14" M3 Pro (18GB/512GB)', tipo: 'Laptop' },
-          { id: 'm-25', marca: 'Apple', modelo: 'MacBook Pro 16" M3 Max (36GB/1TB)', tipo: 'Laptop' },
-          { id: 'm-26', marca: 'Genérico', modelo: 'Cargador Rápido Tipo-C 20W', tipo: 'Cargador' },
-          { id: 'm-27', marca: 'Genérico', modelo: 'Cable USB-C a Lightning 1m', tipo: 'Cable' }
+          { id: 'm-1', marca: 'Apple', modelo: 'iPhone 11', tipo: 'Celular' },
+          { id: 'm-2', marca: 'Apple', modelo: 'iPhone 13', tipo: 'Celular' },
+          { id: 'm-3', marca: 'Apple', modelo: 'iPhone 14', tipo: 'Celular' },
+          { id: 'm-4', marca: 'Apple', modelo: 'iPhone 15', tipo: 'Celular' },
+          { id: 'm-5', marca: 'Apple', modelo: 'iPhone 15 Pro Max', tipo: 'Celular' },
+          { id: 'm-6', marca: 'Apple', modelo: 'iPhone 16', tipo: 'Celular' },
+          { id: 'm-7', marca: 'Apple', modelo: 'iPhone 16 Plus', tipo: 'Celular' },
+          { id: 'm-8', marca: 'Apple', modelo: 'iPhone 16 Pro', tipo: 'Celular' },
+          { id: 'm-9', marca: 'Apple', modelo: 'iPhone 16 Pro Max', tipo: 'Celular' },
+          { id: 'm-10', marca: 'Apple', modelo: 'iPhone 17', tipo: 'Celular' },
+          { id: 'm-11', marca: 'Apple', modelo: 'iPhone 17 Pro', tipo: 'Celular' },
+          { id: 'm-12', marca: 'Apple', modelo: 'iPhone 17 Pro Max', tipo: 'Celular' },
+          { id: 'm-13', marca: 'Apple', modelo: 'MacBook Pro 14" M3', tipo: 'Laptop' },
+          { id: 'm-14', marca: 'Apple', modelo: 'MacBook Pro 14" M3 Pro', tipo: 'Laptop' },
+          { id: 'm-15', marca: 'Apple', modelo: 'MacBook Pro 16" M3 Max', tipo: 'Laptop' },
+          { id: 'm-16', marca: 'Genérico', modelo: 'Cargador Rápido Tipo-C 20W', tipo: 'Cargador' },
+          { id: 'm-17', marca: 'Genérico', modelo: 'Cubo Cargador 20W', tipo: 'Cubo' },
+          { id: 'm-18', marca: 'Genérico', modelo: 'Cable USB-C a Lightning 1m', tipo: 'Cable' }
         ];
         const { error: errModels } = await this.supabase.from('modelos').insert(defaultModels);
         if (errModels) throw errModels;
+
+        // Insertar colores y capacidades opcionales
+        try {
+          await this.supabase.from('colores').insert(this.getDefaultColores());
+          await this.supabase.from('capacidades').insert(this.getDefaultCapacidades());
+        } catch (e) {
+          console.warn("No se pudieron insertar valores por defecto en tablas opcionales de catálogos en Supabase", e);
+        }
 
         await this.syncAll();
         return true;

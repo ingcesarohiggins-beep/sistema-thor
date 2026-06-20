@@ -145,6 +145,7 @@ async function switchView(viewId) {
     renderReports();
   } else if (viewId === 'admin') {
     renderAdminPanel();
+    renderAdminCatalog();
   }
 }
 
@@ -793,7 +794,7 @@ function renderInventory() {
       `;
     }
 
-    if (p.estado === 'baja' && p.bajaDetalle && p.bajaDetalle.motivo.includes('Garantía') && isAdmin) {
+    if (p.estado === 'baja' && p.bajaDetalle && p.bajaDetalle.motivo && typeof p.bajaDetalle.motivo === 'string' && p.bajaDetalle.motivo.includes('Garantía') && isAdmin) {
       actionsHtml += `
         <button class="btn btn-success btn-sm" onclick="openReemplazoModal('${p.id}')" title="Registrar Reemplazo">
           <i class="fa-solid fa-arrows-spin"></i> Reemplazo
@@ -890,11 +891,18 @@ async function saveLoteForm(event) {
 
   try {
     await DB.saveLote(lote);
+  } catch (e) {
+    alert("Error al registrar el lote en la base de datos: " + e.message);
+    return;
+  }
+
+  try {
     closeModal('modal-lote');
     renderInventory();
-    alert("Lote guardado y costos de fletes actualizados.");
+    alert("Lote guardado correctamente.");
   } catch (e) {
-    alert("Error al registrar el lote.");
+    console.error("Error al actualizar la interfaz tras guardar el lote:", e);
+    closeModal('modal-lote');
   }
 }
 
@@ -927,52 +935,51 @@ function openEditBatchModal(id) {
     
     try {
       await DB.saveLote(lote);
+    } catch (e) {
+      alert("Error al guardar el lote en la base de datos: " + e.message);
+      return;
+    }
+
+    try {
       closeModal('modal-lote');
       renderInventory();
       form.onsubmit = saveLoteForm; // restaurar original
       alert("Lote editado con éxito.");
     } catch (e) {
-      alert("Error al guardar lote.");
+      console.error("Error al actualizar la interfaz tras editar el lote:", e);
+      closeModal('modal-lote');
+      form.onsubmit = saveLoteForm;
     }
   };
 }
 
-// --- GESTIÓN DE CATÁLOGO DE MODELOS PREDETERMINADOS ---
 function populateModelsSelector(selectedId = '') {
   const presetSelect = document.getElementById('prod-modelo-preset');
-  const models = DB.getCollection('modelos');
+  const tipo = document.getElementById('prod-tipo').value;
+  const models = DB.getCollection('modelos').filter(m => m.tipo === tipo);
   
-  let options = '<option value="">--- Escribir modelo manualmente ---</option>';
+  let options = '<option value="">--- Selecciona un modelo ---</option>';
   models.sort((a,b) => a.marca.localeCompare(b.marca));
   
   models.forEach(m => {
-    options += `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>[${m.tipo}] ${m.marca} - ${m.modelo}</option>`;
+    options += `<option value="${m.id}" ${m.id === selectedId ? 'selected' : ''}>${m.marca} - ${m.modelo}</option>`;
   });
   
   presetSelect.innerHTML = options;
 }
 
 function onModelPresetChanged() {
-  const presetId = document.getElementById('prod-modelo-preset').value;
-  const models = DB.getCollection('modelos');
-  const matched = models.find(m => m.id === presetId);
-  
-  const tipoInput = document.getElementById('prod-tipo');
-  const modeloInput = document.getElementById('prod-modelo');
-  
-  if (matched) {
-    tipoInput.value = matched.tipo;
-    modeloInput.value = matched.modelo;
-    
-    onProductTypeChanged();
-  } else {
-    modeloInput.value = '';
-  }
+  // Ya no se requiere pre-llenar inputs de texto
 }
 
 function openNewModelModal() {
   const form = document.getElementById('form-nuevo-modelo');
   form.reset();
+  
+  // Forzar tipo del modelo al tipo actual seleccionado
+  const currentType = document.getElementById('prod-tipo').value;
+  document.getElementById('model-tipo').value = currentType;
+  
   openModal('modal-nuevo-modelo');
 }
 
@@ -992,8 +999,10 @@ async function saveNewModelForm(event) {
     
     populateModelsSelector(saved.id);
     onModelPresetChanged();
+    renderAdminCatalog();
     alert("Modelo agregado al catálogo con éxito.");
   } catch (e) {
+    console.error("Error al registrar modelo:", e);
     alert("Error al registrar modelo en el catálogo.");
   }
 }
@@ -1011,7 +1020,9 @@ function openNewProductModal(isEdit = false) {
   const lotes = DB.getLotes();
   document.getElementById('prod-lote').innerHTML = lotes.map(l => `<option value="${l.id}">${l.nombre}</option>`).join('');
 
-  populateModelsSelector();
+  // Llenar colores y capacidades dinámicas
+  populateColorsSelector();
+  populateCapacitiesSelector();
 
   if (!isEdit) {
     document.getElementById('modal-producto-title').textContent = "Registrar Nuevo Producto";
@@ -1024,18 +1035,25 @@ function openNewProductModal(isEdit = false) {
 function onProductTypeChanged() {
   const tipo = document.getElementById('prod-tipo').value;
   const selectCodigo = document.getElementById('prod-tipo-codigo');
-  const colorWrapper = document.getElementById('prod-color-wrapper');
+  const capacidadWrapper = document.getElementById('prod-capacidad-wrapper');
+
+  // Filtrar catálogo por el tipo seleccionado
+  populateModelsSelector();
+
+  // Color se muestra siempre, capacidad (GB) solo para Celular/Laptop
+  if (tipo === 'Celular' || tipo === 'Laptop') {
+    capacidadWrapper.style.display = 'block';
+  } else {
+    capacidadWrapper.style.display = 'none';
+    document.getElementById('prod-capacidad-select').value = '';
+  }
 
   if (tipo === 'Celular') {
     selectCodigo.value = 'imei';
-    colorWrapper.style.display = 'block';
   } else if (tipo === 'Laptop') {
     selectCodigo.value = 'serial';
-    colorWrapper.style.display = 'block';
   } else {
     selectCodigo.value = 'ninguno';
-    colorWrapper.style.display = 'none';
-    document.getElementById('prod-color').value = '';
   }
 
   onTypeCodeChanged();
@@ -1070,25 +1088,13 @@ function onTypeCodeChanged() {
 }
 
 function calculateSuggestedPriceFromForm() {
-  const loteId = document.getElementById('prod-lote').value;
   const costoBase = parseFloat(document.getElementById('prod-costo-base').value) || 0;
-  
-  const lotes = DB.getLotes();
-  const lote = lotes.find(l => l.id === loteId);
-  if (!lote) return;
-
-  const products = DB.getProductos();
-  const productsInBatch = products.filter(p => p.loteId === loteId);
-
   const sugerido = costoBase * 1.20;
 
-  document.getElementById('prod-flete-prorrateado').value = formatCurrency(0);
-  document.getElementById('prod-precio-sugerido').value = formatCurrency(sugerido);
+  // Actualizar etiqueta del helper text sugerido
+  document.getElementById('suggested-helper-text').innerText = 'Sugerido (+20%): S/ ' + Math.round(sugerido);
   
-  const finalPriceInput = document.getElementById('prod-precio-venta');
-  if (!finalPriceInput.value || finalPriceInput.value == 0) {
-    finalPriceInput.value = Math.round(sugerido);
-  }
+  document.getElementById('prod-precio-venta').value = Math.round(sugerido);
 }
 
 function startProductScanner() {
@@ -1175,25 +1181,30 @@ async function saveProductoForm(event) {
   const id = document.getElementById('prod-id').value;
   const loteId = document.getElementById('prod-lote').value;
   const tipo = document.getElementById('prod-tipo').value;
-  const modelo = document.getElementById('prod-modelo').value.trim();
-  const color = (tipo === 'Celular' || tipo === 'Laptop') ? document.getElementById('prod-color').value.trim() : '';
+  
+  const modelSelect = document.getElementById('prod-modelo-preset');
+  if (!modelSelect.value) {
+    alert("Por favor selecciona un modelo.");
+    return;
+  }
+  const modelName = modelSelect.options[modelSelect.selectedIndex].text.replace(/^[^-]+-\s*/, ''); // Limpiar la marca si viniera
+  const capacitySelect = document.getElementById('prod-capacidad-select');
+  const capacidad = (tipo === 'Celular' || tipo === 'Laptop') ? capacitySelect.value : '';
+  const modelo = capacidad ? `${modelName} ${capacidad}` : modelName;
+
+  const color = document.getElementById('prod-color-select').value;
   const tipoCodigo = document.getElementById('prod-tipo-codigo').value;
   const codigo = tipoCodigo !== 'ninguno' ? document.getElementById('prod-codigo').value.trim() : '';
   const stock = tipoCodigo === 'ninguno' ? parseInt(document.getElementById('prod-stock').value) || 0 : 1;
   const costoBase = parseFloat(document.getElementById('prod-costo-base').value) || 0;
   const precioVenta = parseFloat(document.getElementById('prod-precio-venta').value) || 0;
 
-  const lotes = DB.getLotes();
-  const lote = lotes.find(l => l.id === loteId);
-  const products = DB.getProductos();
-  const productsInBatch = products.filter(p => p.loteId === loteId && p.id !== id);
-
   if (precioVenta < costoBase) {
     alert(`Error: El precio de venta (S/ ${precioVenta}) no puede ser menor al costo de adquisición (S/ ${costoBase}).`);
     return;
   }
 
-  const existing = products.find(p => p.id === id);
+  const existing = DB.getProductos().find(p => p.id === id);
   const estado = existing ? existing.estado : 'disponible';
   const existingPhoto = existing ? existing.foto : '';
 
@@ -1207,6 +1218,8 @@ async function saveProductoForm(event) {
     codigo,
     stock,
     costoBase,
+    costoReal: costoBase,
+    precioSugerido: costoBase * 1.20,
     precioVenta,
     foto: productPhotoBase64 || existingPhoto,
     estado: estado
@@ -1218,7 +1231,7 @@ async function saveProductoForm(event) {
     renderInventory();
     alert("Producto guardado correctamente en inventario.");
   } catch (e) {
-    alert("Error al guardar el producto.");
+    alert("Error al guardar el producto: " + e.message);
   }
 }
 
@@ -1233,17 +1246,43 @@ function openEditProductModal(id) {
   document.getElementById('prod-id').value = p.id;
   document.getElementById('prod-lote').value = p.loteId;
   document.getElementById('prod-tipo').value = p.tipo;
-  document.getElementById('prod-modelo').value = p.modelo;
-  document.getElementById('prod-color').value = p.color || '';
-  document.getElementById('prod-tipo-codigo').value = p.tipoCodigo;
 
-  const colorWrapper = document.getElementById('prod-color-wrapper');
-  if (p.tipo === 'Celular' || p.tipo === 'Laptop') {
-    colorWrapper.style.display = 'block';
-  } else {
-    colorWrapper.style.display = 'none';
-  }
+  // Filtrar modelos e intentar pre-seleccionar
+  populateModelsSelector();
   
+  const models = DB.getCollection('modelos').filter(m => m.tipo === p.tipo);
+  // Ordenar por longitud de modelo desc para evitar colisiones (ej. iPhone 17 Pro Max vs iPhone 17 Pro)
+  const sortedModels = [...models].sort((a,b) => b.modelo.length - a.modelo.length);
+  const matchedModel = sortedModels.find(m => p.modelo.startsWith(m.modelo));
+  let capacityPart = '';
+  
+  if (matchedModel) {
+    document.getElementById('prod-modelo-preset').value = matchedModel.id;
+    capacityPart = p.modelo.substring(matchedModel.modelo.length).trim();
+  } else {
+    document.getElementById('prod-modelo-preset').value = '';
+  }
+
+  // Pre-seleccionar color y capacidad (cargando el color/capacidad dinámicamente si falta)
+  const colorSelect = document.getElementById('prod-color-select');
+  if (p.color && !Array.from(colorSelect.options).some(opt => opt.value === p.color)) {
+    const opt = document.createElement('option');
+    opt.value = p.color;
+    opt.text = p.color;
+    colorSelect.add(opt);
+  }
+  colorSelect.value = p.color || '';
+
+  const capacitySelect = document.getElementById('prod-capacidad-select');
+  if (capacityPart && !Array.from(capacitySelect.options).some(opt => opt.value === capacityPart)) {
+    const opt = document.createElement('option');
+    opt.value = capacityPart;
+    opt.text = capacityPart;
+    capacitySelect.add(opt);
+  }
+  capacitySelect.value = capacityPart;
+
+  onProductTypeChanged();
   onTypeCodeChanged();
 
   if (p.tipoCodigo !== 'ninguno') {
@@ -1759,12 +1798,20 @@ async function saveClienteForm(event) {
   };
   try {
     await DB.saveRow('clientes', cliente);
+  } catch (e) {
+    alert("Error al guardar cliente en la base de datos: " + e.message);
+    return;
+  }
+
+  try {
     closeModal('modal-cliente');
     document.getElementById('form-cliente').reset();
     renderContacts();
     renderSalesView();
+    alert("Cliente guardado con éxito.");
   } catch (e) {
-    alert("Error al guardar cliente.");
+    console.error("Error al actualizar la interfaz tras guardar cliente:", e);
+    closeModal('modal-cliente');
   }
 }
 
@@ -1778,12 +1825,20 @@ async function saveProveedorForm(event) {
   };
   try {
     await DB.saveRow('proveedores', proveedor);
+  } catch (e) {
+    alert("Error al guardar proveedor en la base de datos: " + e.message);
+    return;
+  }
+
+  try {
     closeModal('modal-proveedor');
     document.getElementById('form-proveedor').reset();
     renderContacts();
     populateSelectors();
+    alert("Proveedor guardado con éxito.");
   } catch (e) {
-    alert("Error al guardar proveedor.");
+    console.error("Error al actualizar la interfaz tras guardar proveedor:", e);
+    closeModal('modal-proveedor');
   }
 }
 
@@ -2257,4 +2312,211 @@ function exportReportsToCSV() {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+// --- SELECTORES Y FORMULARIOS DE COLOR Y CAPACIDAD ---
+
+function populateColorsSelector(selectedVal = '') {
+  const select = document.getElementById('prod-color-select');
+  const colores = DB.getCollection('colores');
+  
+  let options = '<option value="">--- Selecciona un color ---</option>';
+  colores.forEach(c => {
+    const val = typeof c === 'string' ? c : (c.nombre || c.valor || '');
+    options += `<option value="${val}" ${val === selectedVal ? 'selected' : ''}>${val}</option>`;
+  });
+  select.innerHTML = options;
+}
+
+function populateCapacitiesSelector(selectedVal = '') {
+  const select = document.getElementById('prod-capacidad-select');
+  const capacities = DB.getCollection('capacidades');
+  
+  let options = '<option value="">--- Selecciona capacidad ---</option>';
+  capacities.forEach(c => {
+    const val = typeof c === 'string' ? c : (c.valor || c.capacidad || '');
+    options += `<option value="${val}" ${val === selectedVal ? 'selected' : ''}>${val}</option>`;
+  });
+  select.innerHTML = options;
+}
+
+function openNewColorModal() {
+  const form = document.getElementById('form-nuevo-color');
+  form.reset();
+  openModal('modal-nuevo-color');
+}
+
+async function saveNewColorForm(event) {
+  event.preventDefault();
+  const nombre = document.getElementById('color-nombre').value.trim();
+  const colorObj = { id: null, nombre };
+
+  try {
+    const saved = await DB.saveRow('colores', colorObj);
+    closeModal('modal-nuevo-color');
+    populateColorsSelector(saved.nombre);
+    renderAdminCatalog();
+    alert("Color agregado con éxito.");
+  } catch (e) {
+    alert("Error al registrar el color: " + e.message);
+  }
+}
+
+function openNewCapacityModal() {
+  const form = document.getElementById('form-nueva-capacidad');
+  form.reset();
+  openModal('modal-nueva-capacidad');
+}
+
+async function saveNewCapacityForm(event) {
+  event.preventDefault();
+  const valor = document.getElementById('capacidad-valor').value.trim();
+  const capObj = { id: null, valor };
+
+  try {
+    const saved = await DB.saveRow('capacidades', capObj);
+    closeModal('modal-nueva-capacidad');
+    populateCapacitiesSelector(saved.valor);
+    renderAdminCatalog();
+    alert("Capacidad agregada con éxito.");
+  } catch (e) {
+    alert("Error al registrar la capacidad: " + e.message);
+  }
+}
+
+// --- GESTIÓN DE CATÁLOGOS DESDE PANEL DE ADMINISTRACIÓN ---
+function renderAdminCatalog() {
+  const type = document.getElementById('admin-catalog-type').value;
+  const header = document.getElementById('admin-catalog-table-header');
+  const body = document.getElementById('admin-catalog-table-body');
+  
+  header.innerHTML = '';
+  body.innerHTML = '';
+
+  if (type === 'modelos') {
+    header.innerHTML = `
+      <tr>
+        <th>Marca</th>
+        <th>Modelo</th>
+        <th>Tipo</th>
+        <th>Acciones</th>
+      </tr>
+    `;
+    const items = DB.getCollection('modelos');
+    items.sort((a,b) => a.marca.localeCompare(b.marca) || a.modelo.localeCompare(b.modelo));
+    
+    if (items.length === 0) {
+      body.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-dim); padding:12px;">No hay modelos en el catálogo.</td></tr>';
+      return;
+    }
+    
+    items.forEach(m => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${m.marca}</strong></td>
+        <td>${m.modelo}</td>
+        <td><span class="badge badge-info">${m.tipo}</span></td>
+        <td>
+          <button class="btn btn-danger btn-sm" onclick="deleteCatalogItem('modelos', '${m.id}')" title="Eliminar del catálogo">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+  } else if (type === 'colores') {
+    header.innerHTML = `
+      <tr>
+        <th>Nombre del Color</th>
+        <th>Acciones</th>
+      </tr>
+    `;
+    const items = DB.getCollection('colores');
+    items.sort((a,b) => {
+      const vA = typeof a === 'string' ? a : (a.nombre || '');
+      const vB = typeof b === 'string' ? b : (b.nombre || '');
+      return vA.localeCompare(vB);
+    });
+
+    if (items.length === 0) {
+      body.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-dim); padding:12px;">No hay colores registrados.</td></tr>';
+      return;
+    }
+
+    items.forEach(c => {
+      const id = c.id || c;
+      const nombre = typeof c === 'string' ? c : (c.nombre || '');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${nombre}</strong></td>
+        <td>
+          <button class="btn btn-danger btn-sm" onclick="deleteCatalogItem('colores', '${id}')" title="Eliminar color">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+  } else if (type === 'capacidades') {
+    header.innerHTML = `
+      <tr>
+        <th>Capacidad (GB/TB)</th>
+        <th>Acciones</th>
+      </tr>
+    `;
+    const items = DB.getCollection('capacidades');
+    items.sort((a,b) => {
+      const vA = typeof a === 'string' ? a : (a.valor || '');
+      const vB = typeof b === 'string' ? b : (b.valor || '');
+      return vA.localeCompare(vB);
+    });
+
+    if (items.length === 0) {
+      body.innerHTML = '<tr><td colspan="2" style="text-align:center; color:var(--text-dim); padding:12px;">No hay capacidades registradas.</td></tr>';
+      return;
+    }
+
+    items.forEach(c => {
+      const id = c.id || c;
+      const valor = typeof c === 'string' ? c : (c.valor || '');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${valor}</strong></td>
+        <td>
+          <button class="btn btn-danger btn-sm" onclick="deleteCatalogItem('capacidades', '${id}')" title="Eliminar capacidad">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+}
+
+function openNewCatalogItemModal() {
+  const type = document.getElementById('admin-catalog-type').value;
+  if (type === 'modelos') {
+    openNewModelModal();
+  } else if (type === 'colores') {
+    openNewColorModal();
+  } else if (type === 'capacidades') {
+    openNewCapacityModal();
+  }
+}
+
+async function deleteCatalogItem(type, id) {
+  if (!confirm(`¿Está seguro de eliminar este elemento del catálogo de ${type}?`)) return;
+  try {
+    const success = await DB.deleteRow(type, id);
+    if (success) {
+      alert("Elemento eliminado del catálogo.");
+      renderAdminCatalog();
+      // Refrescar selectores en el formulario de producto
+      populateModelsSelector();
+      populateColorsSelector();
+      populateCapacitiesSelector();
+    }
+  } catch (e) {
+    alert("Error al eliminar del catálogo: " + e.message);
+  }
 }

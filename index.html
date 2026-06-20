@@ -623,35 +623,63 @@
         <!-- 6. VISTA: ADMINISTRACIÓN -->
         <section class="view-pane" id="view-admin">
           <div class="dashboard-layout">
-            <!-- Vendedores -->
-            <div class="glass-card">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3>👥 Gestión de Vendedores</h3>
-                <button class="btn btn-primary btn-sm" onclick="openNewSellerModal()">
-                  <i class="fa-solid fa-user-plus"></i> Nuevo Vendedor
-                </button>
+            <!-- Columna Izquierda: Vendedores y Catálogos -->
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+              <!-- Vendedores -->
+              <div class="glass-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                  <h3>👥 Gestión de Vendedores</h3>
+                  <button class="btn btn-primary btn-sm" onclick="openNewSellerModal()">
+                    <i class="fa-solid fa-user-plus"></i> Nuevo Vendedor
+                  </button>
+                </div>
+                <div class="table-container">
+                  <table class="custom-table">
+                    <thead>
+                      <tr>
+                        <th>Nombre</th>
+                        <th>Usuario</th>
+                        <th>Rol</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="sellers-table-body">
+                      <!-- Dinámico -->
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div class="table-container">
-                <table class="custom-table">
-                  <thead>
-                    <tr>
-                      <th>Nombre</th>
-                      <th>Usuario</th>
-                      <th>Rol</th>
-                      <th>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody id="sellers-table-body">
-                    <!-- Dinámico -->
-                  </tbody>
-                </table>
+
+              <!-- Gestión de Catálogos -->
+              <div class="glass-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+                  <h3>⚙️ Gestión de Catálogos</h3>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <select id="admin-catalog-type" onchange="renderAdminCatalog()" style="width: 130px; padding: 6px 12px; font-size: 13px;">
+                      <option value="modelos">Modelos</option>
+                      <option value="colores">Colores</option>
+                      <option value="capacidades">Capacidades</option>
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="openNewCatalogItemModal()">
+                      <i class="fa-solid fa-plus"></i> Nuevo
+                    </button>
+                  </div>
+                </div>
+                <div class="table-container" style="max-height: 280px; overflow-y: auto;">
+                  <table class="custom-table">
+                    <thead id="admin-catalog-table-header">
+                      <!-- Dinámico -->
+                    </thead>
+                    <tbody id="admin-catalog-table-body">
+                      <!-- Dinámico -->
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
-            <!-- Ajustes de Sistema y Nube -->
+            <!-- Columna Derecha: Ajustes del Sistema -->
             <div style="display: flex; flex-direction: column; gap: 24px;">
-              
-
               <!-- Ajustes Generales -->
               <div class="glass-card" style="display: flex; flex-direction: column; gap: 16px;">
                 <h3>⚙️ Configuración del Negocio</h3>
@@ -665,7 +693,6 @@
                   </button>
                 </div>
               </div>
-
             </div>
           </div>
         </section>
@@ -738,140 +765,148 @@
 
   <!-- MODAL 3: NUEVO PRODUCTO / EDITAR PRODUCTO -->
   <div class="modal-backdrop" id="modal-producto">
-    <div class="modal-card" style="max-width: 550px;">
+    <div class="modal-card" style="max-width: 500px;">
       <div class="modal-header">
         <h3 id="modal-producto-title">Ingreso de Producto</h3>
         <button class="btn-close" onclick="closeModal('modal-producto')">&times;</button>
       </div>
       <form id="form-producto" onsubmit="saveProductoForm(event)">
         <input type="hidden" id="prod-id">
-        <div class="modal-body">
+        <div class="modal-body" style="padding: 12px;">
           
-          <div class="form-row">
-            <div class="form-group">
+          <div class="form-row-compact">
+            <div class="form-group" style="margin-bottom: 8px;">
               <label for="prod-lote">Lote Asignado</label>
-              <select id="prod-lote" required onchange="calculateSuggestedPriceFromForm()">
+              <select id="prod-lote" required onchange="calculateSuggestedPriceFromForm()" style="padding: 8px 12px; font-size: 13px;">
                 <!-- Dinámico -->
               </select>
             </div>
             
-            <!-- Selector de Modelo de Catálogo (Requisito Solicitado) -->
-            <div class="form-group">
-              <label for="prod-modelo-preset">Modelo Predefinido (Catálogo)</label>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="prod-tipo">Tipo de Artículo</label>
+              <select id="prod-tipo" onchange="onProductTypeChanged()" required style="padding: 8px 12px; font-size: 13px;">
+                <option value="Celular">Celular</option>
+                <option value="Laptop">Laptop</option>
+                <option value="Cargador">Cargador</option>
+                <option value="Cubo">Cubo</option>
+                <option value="Cable">Cable</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-compact">
+            <!-- Modelo de Catálogo -->
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="prod-modelo-preset">Modelo (Catálogo)</label>
               <div class="input-with-action">
-                <select id="prod-modelo-preset" onchange="onModelPresetChanged()">
+                <select id="prod-modelo-preset" required style="padding: 8px 12px; font-size: 13px;">
                   <!-- Dinámico -->
                 </select>
-                <button type="button" class="btn btn-secondary" onclick="openNewModelModal()" title="Agregar modelo al catálogo">
+                <button type="button" class="btn btn-secondary" onclick="openNewModelModal()" title="Agregar modelo" style="padding: 4px 8px;">
+                  <i class="fa-solid fa-plus"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Capacidad -->
+            <div class="form-group" id="prod-capacidad-wrapper" style="margin-bottom: 8px;">
+              <label for="prod-capacidad-select">Capacidad</label>
+              <div class="input-with-action">
+                <select id="prod-capacidad-select" style="padding: 8px 12px; font-size: 13px;">
+                  <!-- Dinámico -->
+                </select>
+                <button type="button" class="btn btn-secondary" onclick="openNewCapacityModal()" title="Agregar capacidad" style="padding: 4px 8px;">
                   <i class="fa-solid fa-plus"></i>
                 </button>
               </div>
             </div>
           </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label for="prod-tipo">Tipo de Artículo</label>
-              <select id="prod-tipo" onchange="onProductTypeChanged()" required>
-                <option value="Celular">Celular</option>
-                <option value="Laptop">Laptop</option>
-                <option value="Cargador">Cargador</option>
-                <option value="Cable">Cable</option>
-                <option value="Otro">Otro</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="prod-modelo">Descripción / Nombre del Equipo</label>
-              <input type="text" id="prod-modelo" class="form-control" placeholder="Ej. Samsung S24 256GB / Cargador OEM 20W" required>
-            </div>
-          </div>
-
-          <!-- Color del Producto (Condicional Celulares / Laptops) -->
-          <div class="form-row" id="prod-color-wrapper" style="display: none;">
-            <div class="form-group">
-              <label for="prod-color">Color</label>
-              <input type="text" id="prod-color" class="form-control" placeholder="Ej. Titanio Natural, Space Gray, Blanco, etc.">
-            </div>
-          </div>
-
-          <!-- Selector de Código (Requisito Especial) -->
-          <div class="form-row">
-            <div class="form-group">
-              <label for="prod-tipo-codigo">Tipo de Identificador</label>
-              <select id="prod-tipo-codigo" onchange="onTypeCodeChanged()" required>
-                <option value="imei">Con IMEI (Único)</option>
-                <option value="serial">Con Otro Código (Serial/Lote)</option>
-                <option value="ninguno">Sin Código (Venta por cantidad)</option>
-              </select>
-            </div>
-            <div class="form-group" id="prod-codigo-wrapper">
-              <label for="prod-codigo" id="prod-codigo-label">IMEI (15 dígitos)</label>
+          <!-- Color y Código/Stock -->
+          <div class="form-row-compact">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="prod-color-select">Color</label>
               <div class="input-with-action">
-                <input type="text" id="prod-codigo" class="form-control" placeholder="Escribe o escanea con cámara">
-                <button type="button" class="btn btn-primary" id="btn-scan-prod-code" onclick="startProductScanner()">
-                  <i class="fa-solid fa-camera"></i>
+                <select id="prod-color-select" required style="padding: 8px 12px; font-size: 13px;">
+                  <!-- Dinámico -->
+                </select>
+                <button type="button" class="btn btn-secondary" onclick="openNewColorModal()" title="Agregar color" style="padding: 4px 8px;">
+                  <i class="fa-solid fa-plus"></i>
                 </button>
               </div>
             </div>
-            <div class="form-group" id="prod-stock-wrapper" style="display: none;">
-              <label for="prod-stock">Cantidad en Stock Inicial</label>
-              <input type="number" id="prod-stock" class="form-control" value="1" min="1">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="prod-tipo-codigo">Tipo Identificador</label>
+              <select id="prod-tipo-codigo" onchange="onTypeCodeChanged()" required style="padding: 8px 12px; font-size: 13px;">
+                <option value="imei">Con IMEI (Único)</option>
+                <option value="serial">Con Serial/Código</option>
+                <option value="ninguno">Sin Código (Stock)</option>
+              </select>
             </div>
           </div>
 
           <!-- Precios y Costos -->
-          <div class="form-row">
-            <div class="form-group">
-              <label for="prod-costo-base">Costo de Compra (S/)</label>
-              <input type="number" id="prod-costo-base" class="form-control" placeholder="Costo de compra unitario" oninput="calculateSuggestedPriceFromForm()" required min="0">
+          <div class="form-row-compact">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="prod-costo-base">Costo Compra (S/)</label>
+              <input type="number" id="prod-costo-base" class="form-control" placeholder="Costo" oninput="calculateSuggestedPriceFromForm()" required min="0" style="padding: 8px 12px; font-size: 13px;">
+              <div id="suggested-helper-text" style="font-size: 11px; color: var(--color-warning); margin-top: 3px; font-weight: 600;">Sugerido (+20%): S/ 0</div>
             </div>
-            <div class="form-group" style="display: none;">
-              <label>Flete Prorrateado (Auto)</label>
-              <input type="text" id="prod-flete-prorrateado" class="form-control" disabled value="0">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label>Precio Sugerido (+20% Utilidad)</label>
-              <input type="text" id="prod-precio-sugerido" class="form-control" disabled value="$0">
-            </div>
-            <div class="form-group">
-              <label for="prod-precio-venta">Precio de Venta Final ($)</label>
-              <input type="number" id="prod-precio-venta" class="form-control" placeholder="Define el precio final" required min="0">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="prod-precio-venta">Precio Venta Final (S/)</label>
+              <input type="number" id="prod-precio-venta" class="form-control" placeholder="Precio" required min="0" style="padding: 8px 12px; font-size: 13px;">
             </div>
           </div>
 
-          <!-- Foto del producto -->
-          <div class="form-group">
-            <label>Foto del Producto</label>
-            <div class="product-photo-preview" id="photo-preview-box">
-              <div class="product-photo-placeholder" id="photo-placeholder">
-                <i class="fa-solid fa-image"></i>
-                <span>Arrastra o selecciona un archivo (o toma foto)</span>
+          <!-- Código (IMEI/Serial) o Stock (Cantidad) -->
+          <div class="form-row-compact">
+            <div class="form-group" id="prod-codigo-wrapper" style="grid-column: span 2; margin-bottom: 8px;">
+              <label for="prod-codigo" id="prod-codigo-label">IMEI (15 dígitos)</label>
+              <div class="input-with-action">
+                <input type="text" id="prod-codigo" class="form-control" placeholder="IMEI/Código" style="padding: 8px 12px; font-size: 13px;">
+                <button type="button" class="btn btn-primary" id="btn-scan-prod-code" onclick="startProductScanner()" style="padding: 6px 12px;">
+                  <i class="fa-solid fa-camera"></i>
+                </button>
               </div>
-              <img id="photo-preview-img" style="display: none;" src="">
             </div>
-            <input type="file" id="prod-photo-input" class="photo-input-hidden" accept="image/*" onchange="handlePhotoUpload(event)">
-            <div style="display: flex; gap: 8px; margin-top: 8px;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="triggerPhotoInput()">
-                <i class="fa-solid fa-file-image"></i> Subir Foto
-              </button>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="startCameraForPhoto()">
-                <i class="fa-solid fa-camera"></i> Usar Cámara
-              </button>
+            <div class="form-group" id="prod-stock-wrapper" style="display: none; grid-column: span 2; margin-bottom: 8px;">
+              <label for="prod-stock">Cantidad en Stock</label>
+              <input type="number" id="prod-stock" class="form-control" value="1" min="1" style="padding: 8px 12px; font-size: 13px;">
             </div>
-            <video id="camera-stream" style="display: none; width: 100%; height: 180px; object-fit: cover; border-radius: 8px; margin-top: 8px;"></video>
+          </div>
+
+          <!-- Foto del producto compacta -->
+          <div class="form-group" style="margin-bottom: 4px; margin-top: 2px;">
+            <label style="font-size: 12px;">Foto del Producto</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div class="product-photo-preview" id="photo-preview-box" style="width: 42px; height: 42px; border-radius: 6px; border: 1px dashed var(--border-color); flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: rgba(255,255,255,0.02); margin-top: 0;">
+                <div class="product-photo-placeholder" id="photo-placeholder" style="font-size: 14px;">
+                  <i class="fa-solid fa-image"></i>
+                </div>
+                <img id="photo-preview-img" style="display: none; width: 100%; height: 100%; object-fit: cover;" src="">
+              </div>
+              <div style="display: flex; gap: 6px; flex-grow: 1;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="triggerPhotoInput()" style="padding: 6px 10px; font-size: 12px; flex: 1;">
+                  <i class="fa-solid fa-file-image"></i> Subir
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="startCameraForPhoto()" style="padding: 6px 10px; font-size: 12px; flex: 1;">
+                  <i class="fa-solid fa-camera"></i> Cámara
+                </button>
+              </div>
+            </div>
+            <input type="file" id="prod-photo-input" class="photo-input-hidden" accept="image/*" onchange="handlePhotoUpload(event)" style="display: none;">
+            <video id="camera-stream" style="display: none; width: 100%; height: 110px; object-fit: cover; border-radius: 8px; margin-top: 6px;"></video>
             <canvas id="camera-canvas" style="display: none;"></canvas>
-            <button type="button" id="btn-capture-photo" class="btn btn-success btn-sm" style="display: none; margin-top: 8px; width: 100%;">
+            <button type="button" id="btn-capture-photo" class="btn btn-success btn-sm" style="display: none; margin-top: 6px; width: 100%; padding: 4px 8px;">
               <i class="fa-solid fa-circle"></i> Capturar Foto
             </button>
           </div>
 
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-producto')">Cancelar</button>
-          <button type="submit" class="btn btn-success" id="btn-save-product">Guardar Producto</button>
+        <div class="modal-footer" style="padding: 8px 16px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('modal-producto')">Cancelar</button>
+          <button type="submit" class="btn btn-success btn-sm" id="btn-save-product">Guardar Producto</button>
         </div>
       </form>
     </div>
@@ -1146,6 +1181,7 @@
               <option value="Celular">Celular</option>
               <option value="Laptop">Laptop</option>
               <option value="Cargador">Cargador</option>
+              <option value="Cubo">Cubo</option>
               <option value="Cable">Cable</option>
               <option value="Otro">Otro</option>
             </select>
@@ -1185,6 +1221,50 @@
           Finalizar y Volver al Inicio
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NUEVO COLOR -->
+  <div class="modal-backdrop" id="modal-nuevo-color">
+    <div class="modal-card" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>✨ Agregar Nuevo Color</h3>
+        <button class="btn-close" onclick="closeModal('modal-nuevo-color')">&times;</button>
+      </div>
+      <form id="form-nuevo-color" onsubmit="saveNewColorForm(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="color-nombre">Nombre del Color</label>
+            <input type="text" id="color-nombre" class="form-control" placeholder="Ej. Titanio Natural, Space Gray" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-nuevo-color')">Cancelar</button>
+          <button type="submit" class="btn btn-success">Agregar Color</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NUEVA CAPACIDAD -->
+  <div class="modal-backdrop" id="modal-nueva-capacidad">
+    <div class="modal-card" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>✨ Agregar Nueva Capacidad</h3>
+        <button class="btn-close" onclick="closeModal('modal-nueva-capacidad')">&times;</button>
+      </div>
+      <form id="form-nueva-capacidad" onsubmit="saveNewCapacityForm(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="capacidad-valor">Valor de Capacidad</label>
+            <input type="text" id="capacidad-valor" class="form-control" placeholder="Ej. 128GB, 256GB, 1TB" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-nueva-capacidad')">Cancelar</button>
+          <button type="submit" class="btn btn-success">Agregar Capacidad</button>
+        </div>
+      </form>
     </div>
   </div>
 
