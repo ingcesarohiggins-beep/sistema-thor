@@ -1175,6 +1175,30 @@ function startCameraForPhoto() {
   };
 }
 
+function stopCameraStream() {
+  const video = document.getElementById('camera-stream');
+  const btnCapture = document.getElementById('btn-capture-photo');
+  
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(track => track.stop());
+    cameraStream = null;
+  }
+  
+  if (video) video.style.display = 'none';
+  if (btnCapture) btnCapture.style.display = 'none';
+
+  // Also clean up Baja and Reemplazo streams/elements if they were running (in case a modal is closed)
+  const bajaVideo = document.getElementById('baja-camera-stream');
+  const bajaBtnCapture = document.getElementById('baja-btn-capture-photo');
+  if (bajaVideo) bajaVideo.style.display = 'none';
+  if (bajaBtnCapture) bajaBtnCapture.style.display = 'none';
+
+  const reemVideo = document.getElementById('reem-camera-stream');
+  const reemBtnCapture = document.getElementById('reem-btn-capture-photo');
+  if (reemVideo) reemVideo.style.display = 'none';
+  if (reemBtnCapture) reemBtnCapture.style.display = 'none';
+}
+
 async function saveProductoForm(event) {
   event.preventDefault();
 

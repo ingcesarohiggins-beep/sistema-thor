@@ -6,7 +6,9 @@
   "scripts": {
     "start": "npx serve -l 3000 ."
   },
-  "dependencies": {},
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2"
+  },
   "devDependencies": {
     "serve": "^14.2.1"
   }
