@@ -10,10 +10,25 @@ const DB = {
   cache: {},
   isDemoMode: true,
 
+  // Limpiar y normalizar URL de Supabase para evitar errores si el usuario copia la URL REST
+  sanitizeSupabaseUrl(url) {
+    if (!url) return '';
+    let clean = url.trim();
+    const restIdx = clean.indexOf('/rest/v1');
+    if (restIdx !== -1) {
+      clean = clean.substring(0, restIdx);
+    }
+    if (clean.endsWith('/')) {
+      clean = clean.slice(0, -1);
+    }
+    return clean;
+  },
+
   // Inicialización
   async init() {
-    this.supabaseUrl = localStorage.getItem('cel_supabase_url');
+    this.supabaseUrl = this.sanitizeSupabaseUrl(localStorage.getItem('cel_supabase_url'));
     this.supabaseKey = localStorage.getItem('cel_supabase_key');
+    if (this.supabaseKey) this.supabaseKey = this.supabaseKey.trim();
     
     if (this.supabaseUrl && this.supabaseKey) {
       try {
@@ -135,7 +150,10 @@ const DB = {
 
   // Guardar y probar configuración de Supabase
   async setSupabaseConfig(url, key) {
-    if (!url || !key || url.trim() === '' || key.trim() === '') {
+    url = this.sanitizeSupabaseUrl(url);
+    key = key ? key.trim() : '';
+
+    if (!url || !key) {
       localStorage.removeItem('cel_supabase_url');
       localStorage.removeItem('cel_supabase_key');
       this.supabaseUrl = null;
@@ -171,6 +189,9 @@ const DB = {
   },
 
   async testSupabaseConfig(url, key) {
+    url = this.sanitizeSupabaseUrl(url);
+    key = key ? key.trim() : '';
+
     if (!url || !key) {
       return { success: false, message: 'La URL y la clave Anon Key son obligatorias.' };
     }
