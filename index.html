@@ -686,10 +686,18 @@
                 <p style="font-size: 13px; color: var(--text-muted);">Parámetros globales del panel y restablecimiento.</p>
                 
                 <div class="form-group">
-                  <label>Restablecer Base de Datos</label>
-                  <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">Esto borrará todo el inventario, ventas y egresos, y cargará la configuración inicial en la base de datos activa (local o Sheets).</p>
-                  <button class="btn btn-danger btn-sm" onclick="resetDatabaseToDefault()">
+                  <label>Cargar Datos de Prueba (Mocks)</label>
+                  <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">Borra todo y carga 300 celulares, 50 laptops y 50 cargadores/cables de prueba distribuidos en 20 lotes con 100 clientes y 25 proveedores para realizar simulaciones.</p>
+                  <button class="btn btn-primary btn-sm" onclick="resetDatabaseToDefault()">
                     <i class="fa-solid fa-triangle-exclamation"></i> Formatear y Cargar Mocks
+                  </button>
+                </div>
+
+                <div class="form-group" style="border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 16px;">
+                  <label style="color: var(--color-danger);">Vaciar Base de Datos (Completamente Vacío)</label>
+                  <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 8px;">Borra toda la información para empezar a trabajar desde cero con datos reales. Requiere contraseña de seguridad.</p>
+                  <button class="btn btn-danger btn-sm" onclick="triggerWipeDatabase()">
+                    <i class="fa-solid fa-trash-can"></i> Vaciar Base de Datos
                   </button>
                 </div>
               </div>

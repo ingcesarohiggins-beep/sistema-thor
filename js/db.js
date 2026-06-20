@@ -616,19 +616,13 @@ const DB = {
     };
   },
 
-  // Resetear base de datos completa
+  // Resetear base de datos completa con Datos de Prueba (Mocks masivos)
   async resetDatabaseToDefault() {
     if (this.isDemoMode) {
-      localStorage.removeItem('demo_vendedores');
-      localStorage.removeItem('demo_proveedores');
-      localStorage.removeItem('demo_clientes');
-      localStorage.removeItem('demo_lotes');
-      localStorage.removeItem('demo_productos');
-      localStorage.removeItem('demo_ventas');
-      localStorage.removeItem('demo_egresos');
-      localStorage.removeItem('demo_modelos');
-      localStorage.removeItem('demo_colores');
-      localStorage.removeItem('demo_capacidades');
+      const mockData = this.generateMockData();
+      Object.keys(mockData).forEach(table => {
+        localStorage.setItem('demo_' + table, JSON.stringify(mockData[table]));
+      });
       this.initLocalDemo();
       return true;
     } else {
@@ -648,68 +642,305 @@ const DB = {
           console.warn("No se pudieron limpiar las tablas opcionales de catálogos en Supabase", e);
         }
 
-        // Insertar vendedores iniciales
-        const defaultSellers = [
-          { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' },
-          { id: 'v-2', nombre: 'Vendedor Uno', usuario: 'vendedor1@thor.com', contrasena: 'ventasthor1', rol: 'vendedor' },
-          { id: 'v-3', nombre: 'Vendedor Dos', usuario: 'vendedor2@thor.com', contrasena: 'ventasthor2', rol: 'vendedor' }
-        ];
-        const { error: errSellers } = await this.supabase.from('vendedores').insert(defaultSellers);
+        const mockData = this.generateMockData();
+
+        // Insertar en orden correcto para respetar claves foráneas (FK)
+        const { error: errSellers } = await this.supabase.from('vendedores').insert(mockData.vendedores);
         if (errSellers) throw errSellers;
 
-        // Insertar proveedores iniciales
-        const defaultProviders = [
-          { id: 'p-1', nombre: 'Celular Express Mayorista', telefono: '+57 312 4567890', email: 'ventas@celularexpress.com' },
-          { id: 'p-2', nombre: 'Accesorios & Cargas SAS', telefono: '+57 300 9876543', email: 'contacto@accesorioscargas.com' }
-        ];
-        const { error: errProviders } = await this.supabase.from('proveedores').insert(defaultProviders);
+        const { error: errProviders } = await this.supabase.from('proveedores').insert(mockData.proveedores);
         if (errProviders) throw errProviders;
 
-        // Insertar clientes iniciales
-        const defaultClients = [
-          { id: 'c-general', nombre: 'Cliente General (Venta Rápida)', documento: '99999999', telefono: '00000000' },
-          { id: 'c-1', nombre: 'María Camila Ortega', documento: '1098765432', telefono: '+57 315 2223344' }
-        ];
-        const { error: errClients } = await this.supabase.from('clientes').insert(defaultClients);
+        const { error: errClients } = await this.supabase.from('clientes').insert(mockData.clientes);
         if (errClients) throw errClients;
 
-        // Insertar modelos iniciales base
-        const defaultModels = [
-          { id: 'm-1', marca: 'Apple', modelo: 'iPhone 11', tipo: 'Celular' },
-          { id: 'm-2', marca: 'Apple', modelo: 'iPhone 13', tipo: 'Celular' },
-          { id: 'm-3', marca: 'Apple', modelo: 'iPhone 14', tipo: 'Celular' },
-          { id: 'm-4', marca: 'Apple', modelo: 'iPhone 15', tipo: 'Celular' },
-          { id: 'm-5', marca: 'Apple', modelo: 'iPhone 15 Pro Max', tipo: 'Celular' },
-          { id: 'm-6', marca: 'Apple', modelo: 'iPhone 16', tipo: 'Celular' },
-          { id: 'm-7', marca: 'Apple', modelo: 'iPhone 16 Plus', tipo: 'Celular' },
-          { id: 'm-8', marca: 'Apple', modelo: 'iPhone 16 Pro', tipo: 'Celular' },
-          { id: 'm-9', marca: 'Apple', modelo: 'iPhone 16 Pro Max', tipo: 'Celular' },
-          { id: 'm-10', marca: 'Apple', modelo: 'iPhone 17', tipo: 'Celular' },
-          { id: 'm-11', marca: 'Apple', modelo: 'iPhone 17 Pro', tipo: 'Celular' },
-          { id: 'm-12', marca: 'Apple', modelo: 'iPhone 17 Pro Max', tipo: 'Celular' },
-          { id: 'm-13', marca: 'Apple', modelo: 'MacBook Pro 14" M3', tipo: 'Laptop' },
-          { id: 'm-14', marca: 'Apple', modelo: 'MacBook Pro 14" M3 Pro', tipo: 'Laptop' },
-          { id: 'm-15', marca: 'Apple', modelo: 'MacBook Pro 16" M3 Max', tipo: 'Laptop' },
-          { id: 'm-16', marca: 'Genérico', modelo: 'Cargador Rápido Tipo-C 20W', tipo: 'Cargador' },
-          { id: 'm-17', marca: 'Genérico', modelo: 'Cubo Cargador 20W', tipo: 'Cubo' },
-          { id: 'm-18', marca: 'Genérico', modelo: 'Cable USB-C a Lightning 1m', tipo: 'Cable' }
-        ];
-        const { error: errModels } = await this.supabase.from('modelos').insert(defaultModels);
+        const { error: errModels } = await this.supabase.from('modelos').insert(mockData.modelos);
         if (errModels) throw errModels;
 
         // Insertar colores y capacidades opcionales
         try {
-          await this.supabase.from('colores').insert(this.getDefaultColores());
-          await this.supabase.from('capacidades').insert(this.getDefaultCapacidades());
+          await this.supabase.from('colores').insert(mockData.colores);
+          await this.supabase.from('capacidades').insert(mockData.capacidades);
         } catch (e) {
-          console.warn("No se pudieron insertar valores por defecto en tablas opcionales de catálogos en Supabase", e);
+          console.warn("No se pudieron insertar colores y capacidades en Supabase", e);
         }
+
+        const { error: errLotes } = await this.supabase.from('lotes').insert(mockData.lotes);
+        if (errLotes) throw errLotes;
+
+        // Insertar productos masivos (300 celulares + 50 laptops + accesorios)
+        // El SDK de Supabase maneja perfectamente un array de ~350 filas en un solo insert
+        const { error: errProducts } = await this.supabase.from('productos').insert(mockData.productos);
+        if (errProducts) throw errProducts;
 
         await this.syncAll();
         return true;
       } catch (err) {
-        console.error("Error al resetear base de datos en Supabase:", err);
+        console.error("Error al resetear base de datos en Supabase con Mocks:", err);
         alert(`Error al formatear Supabase: ${err.message || err}`);
+        return false;
+      }
+    }
+  },
+
+  // Generador Programático de Datos Masivos para Pruebas Completas
+  generateMockData() {
+    const defaultSellers = [
+      { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' },
+      { id: 'v-2', nombre: 'Vendedor Uno', usuario: 'vendedor1@thor.com', contrasena: 'ventasthor1', rol: 'vendedor' },
+      { id: 'v-3', nombre: 'Vendedor Dos', usuario: 'vendedor2@thor.com', contrasena: 'ventasthor2', rol: 'vendedor' }
+    ];
+
+    // 25 Proveedores
+    const providers = [];
+    const providerNames = [
+      'Celular Express Mayorista', 'Accesorios & Cargas SAS', 'Importaciones Thor Lima', 'Tech Distribution PE',
+      'Global Phones S.A.C.', 'Mayorista Alianza Movil', 'Proveedor Alpha Electronica', 'Accesorios Moviles del Peru',
+      'Suministros Corporativos Tech', 'Importadora Cellnet', 'Distribuidor Movil Central', 'Inversiones Telefonicas PE',
+      'Smarttech Mayoristas', 'Grupo Conectividad Peru', 'Master Cell Peru', 'Premium Accessories S.A.',
+      'Suministros Alfa & Omega', 'Distribuidora Lima Celular', 'Mayorista Omega Tech', 'Comercializadora Movil SAC',
+      'Redes y Cables Peru', 'Cargadores y Mas', 'Accesorios Express SAC', 'Fenix Import Tech', 'Celulares del Norte Mayoristas'
+    ];
+    for (let i = 1; i <= 25; i++) {
+      providers.push({
+        id: `p-${i}`,
+        nombre: providerNames[i-1] || `Proveedor Mayorista #${i}`,
+        telefono: `+51 987 654 3${String(i).padStart(2, '0')}`,
+        email: `ventas${i}@proveedor.pe`
+      });
+    }
+
+    // 100 Clientes
+    const clients = [
+      { id: 'c-general', nombre: 'Cliente General (Venta Rápida)', documento: '99999999', telefono: '00000000' }
+    ];
+    const firstNames = ['Juan', 'Maria', 'Pedro', 'Ana', 'Luis', 'Carlos', 'Sofia', 'Jorge', 'Lucia', 'Diego', 'Camila', 'Andrea', 'Manuel', 'Gabriela', 'Raul', 'Rosa', 'Hector', 'Elena', 'Oscar', 'Silvia'];
+    const lastNames = ['Perez', 'Gomez', 'Rodriguez', 'Lopez', 'Martinez', 'Sanchez', 'Pereda', 'Flores', 'Torres', 'Ramirez', 'Cruz', 'Diaz', 'Reyes', 'Morales', 'Ortiz', 'Gutierrez', 'Castillo', 'Vargas', 'Rojas', 'Salazar'];
+    for (let i = 1; i <= 100; i++) {
+      const fn = firstNames[Math.floor(Math.random() * firstNames.length)];
+      const ln = lastNames[Math.floor(Math.random() * lastNames.length)];
+      const doc = String(10000000 + i * 87431).substring(0, 8);
+      clients.push({
+        id: `c-${i}`,
+        nombre: `${fn} ${ln}`,
+        documento: doc,
+        telefono: `+51 955 ${String(100 + i * 7).padStart(3, '0')} ${String(i * 3).padStart(3, '0')}`
+      });
+    }
+
+    // 20 Lotes
+    const lotes = [];
+    for (let i = 1; i <= 20; i++) {
+      const pId = `p-${Math.floor(Math.random() * 25) + 1}`;
+      const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0');
+      const month = Math.random() > 0.5 ? '05' : '06';
+      lotes.push({
+        id: `l-${i}`,
+        nombre: `Lote de Importación #${String(i).padStart(2, '0')}`,
+        proveedorId: pId,
+        flete: 0,
+        fecha: `2026-${month}-${day}`
+      });
+    }
+
+    // Modelos predefinidos base
+    const baseModelsCelulares = [
+      { marca: 'Apple', modelo: 'iPhone 11', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 13', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 14', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 15', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 15 Pro Max', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 16', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 16 Plus', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 16 Pro', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 16 Pro Max', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 17', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 17 Pro', tipo: 'Celular' },
+      { marca: 'Apple', modelo: 'iPhone 17 Pro Max', tipo: 'Celular' }
+    ];
+
+    const baseModelsLaptops = [
+      { marca: 'Apple', modelo: 'MacBook Pro 14" M3', tipo: 'Laptop' },
+      { marca: 'Apple', modelo: 'MacBook Pro 14" M3 Pro', tipo: 'Laptop' },
+      { marca: 'Apple', modelo: 'MacBook Pro 16" M3 Max', tipo: 'Laptop' }
+    ];
+
+    const colors = ['Space Gray', 'Silver', 'Gold', 'Midnight', 'Starlight', 'Negro', 'Blanco', 'Azul', 'Rojo', 'Verde'];
+    const capacitiesCelulares = ['64GB', '128GB', '256GB', '512GB', '1TB'];
+    const capacitiesLaptops = ['8GB/512GB', '18GB/512GB', '36GB/1TB'];
+
+    const productos = [];
+
+    // Generar 300 celulares
+    for (let i = 1; i <= 300; i++) {
+      const base = baseModelsCelulares[Math.floor(Math.random() * baseModelsCelulares.length)];
+      const cap = capacitiesCelulares[Math.floor(Math.random() * capacitiesCelulares.length)];
+      const col = colors[Math.floor(Math.random() * colors.length)];
+      const lId = `l-${Math.floor(Math.random() * 20) + 1}`;
+      const imei = '358912' + String(100000000 + i * 29381).substring(0, 9);
+      const costoBase = Math.floor(Math.random() * 2000) + 1500; // 1500 a 3500 soles
+
+      productos.push({
+        id: `prod-cel-${i}`,
+        loteId: lId,
+        tipo: 'Celular',
+        modelo: `${base.modelo} ${cap}`,
+        color: col,
+        tipoCodigo: 'imei',
+        codigo: imei,
+        stock: 1,
+        costoBase: costoBase,
+        costoReal: costoBase,
+        precioSugerido: costoBase * 1.20,
+        precioVenta: Math.round(costoBase * 1.20),
+        estado: 'disponible',
+        foto: ''
+      });
+    }
+
+    // Generar 50 laptops
+    for (let i = 1; i <= 50; i++) {
+      const base = baseModelsLaptops[Math.floor(Math.random() * baseModelsLaptops.length)];
+      const cap = capacitiesLaptops[Math.floor(Math.random() * capacitiesLaptops.length)];
+      const col = colors[Math.floor(Math.random() * 2)]; // Space Gray o Silver
+      const lId = `l-${Math.floor(Math.random() * 20) + 1}`;
+      const serial = 'C02G' + String(10000000 + i * 49201).substring(0, 8).toUpperCase();
+      const costoBase = Math.floor(Math.random() * 4000) + 5000; // 5000 a 9000 soles
+
+      productos.push({
+        id: `prod-lap-${i}`,
+        loteId: lId,
+        tipo: 'Laptop',
+        modelo: `${base.modelo} ${cap}`,
+        color: col,
+        tipoCodigo: 'serial',
+        codigo: serial,
+        stock: 1,
+        costoBase: costoBase,
+        costoReal: costoBase,
+        precioSugerido: costoBase * 1.20,
+        precioVenta: Math.round(costoBase * 1.20),
+        estado: 'disponible',
+        foto: ''
+      });
+    }
+
+    // Generar 50 cubos y cables (accesorios sin código, distribuidos en stock de productos)
+    const baseAccessories = [
+      { modelo: 'Cargador Rápido Tipo-C 20W', tipo: 'Cargador', color: 'Blanco', stock: 10, costoBase: 50, precioVenta: 70 },
+      { modelo: 'Cargador Rápido Tipo-C 20W', tipo: 'Cargador', color: 'Negro', stock: 10, costoBase: 50, precioVenta: 70 },
+      { modelo: 'Cubo Cargador 20W', tipo: 'Cubo', color: 'Blanco', stock: 5, costoBase: 40, precioVenta: 60 },
+      { modelo: 'Cubo Cargador 35W Dual', tipo: 'Cubo', color: 'Blanco', stock: 5, costoBase: 70, precioVenta: 100 },
+      { modelo: 'Cubo Cargador 60W GaN', tipo: 'Cubo', color: 'Negro', stock: 5, costoBase: 120, precioVenta: 160 },
+      { modelo: 'Cable USB-C a Lightning 1m', tipo: 'Cable', color: 'Blanco', stock: 10, costoBase: 30, precioVenta: 50 },
+      { modelo: 'Cable USB-C a USB-C 2m', tipo: 'Cable', color: 'Negro', stock: 10, costoBase: 35, precioVenta: 55 }
+    ];
+
+    baseAccessories.forEach((acc, idx) => {
+      const lId = `l-${Math.floor(Math.random() * 20) + 1}`;
+      productos.push({
+        id: `prod-acc-${idx+1}`,
+        loteId: lId,
+        tipo: acc.tipo,
+        modelo: acc.modelo,
+        color: acc.color,
+        tipoCodigo: 'ninguno',
+        codigo: '',
+        stock: acc.stock,
+        costoBase: acc.costoBase,
+        costoReal: acc.costoBase,
+        precioSugerido: acc.costoBase * 1.20,
+        precioVenta: acc.precioVenta,
+        estado: 'disponible',
+        foto: ''
+      });
+    });
+
+    const modelos = [
+      { id: 'm-1', marca: 'Apple', modelo: 'iPhone 11', tipo: 'Celular' },
+      { id: 'm-2', marca: 'Apple', modelo: 'iPhone 13', tipo: 'Celular' },
+      { id: 'm-3', marca: 'Apple', modelo: 'iPhone 14', tipo: 'Celular' },
+      { id: 'm-4', marca: 'Apple', modelo: 'iPhone 15', tipo: 'Celular' },
+      { id: 'm-5', marca: 'Apple', modelo: 'iPhone 15 Pro Max', tipo: 'Celular' },
+      { id: 'm-6', marca: 'Apple', modelo: 'iPhone 16', tipo: 'Celular' },
+      { id: 'm-7', marca: 'Apple', modelo: 'iPhone 16 Plus', tipo: 'Celular' },
+      { id: 'm-8', marca: 'Apple', modelo: 'iPhone 16 Pro', tipo: 'Celular' },
+      { id: 'm-9', marca: 'Apple', modelo: 'iPhone 16 Pro Max', tipo: 'Celular' },
+      { id: 'm-10', marca: 'Apple', modelo: 'iPhone 17', tipo: 'Celular' },
+      { id: 'm-11', marca: 'Apple', modelo: 'iPhone 17 Pro', tipo: 'Celular' },
+      { id: 'm-12', marca: 'Apple', modelo: 'iPhone 17 Pro Max', tipo: 'Celular' },
+      { id: 'm-13', marca: 'Apple', modelo: 'MacBook Pro 14" M3', tipo: 'Laptop' },
+      { id: 'm-14', marca: 'Apple', modelo: 'MacBook Pro 14" M3 Pro', tipo: 'Laptop' },
+      { id: 'm-15', marca: 'Apple', modelo: 'MacBook Pro 16" M3 Max', tipo: 'Laptop' },
+      { id: 'm-16', marca: 'Genérico', modelo: 'Cargador Rápido Tipo-C 20W', tipo: 'Cargador' },
+      { id: 'm-17', marca: 'Genérico', modelo: 'Cubo Cargador 20W', tipo: 'Cubo' },
+      { id: 'm-18', marca: 'Genérico', modelo: 'Cubo Cargador 35W Dual', tipo: 'Cubo' },
+      { id: 'm-19', marca: 'Genérico', modelo: 'Cubo Cargador 60W GaN', tipo: 'Cubo' },
+      { id: 'm-20', marca: 'Genérico', modelo: 'Cable USB-C a Lightning 1m', tipo: 'Cable' },
+      { id: 'm-21', marca: 'Genérico', modelo: 'Cable USB-C a USB-C 2m', tipo: 'Cable' }
+    ];
+
+    return {
+      vendedores: defaultSellers,
+      proveedores: providers,
+      clientes: clients,
+      lotes: lotes,
+      productos: productos,
+      modelos: modelos,
+      ventas: [],
+      egresos: [],
+      colores: this.getDefaultColores(),
+      capacidades: this.getDefaultCapacidades()
+    };
+  },
+
+  // Vaciar base de datos completamente (Dejar solo Admin principal para empezar de cero)
+  async wipeDatabaseCompletely() {
+    if (this.isDemoMode) {
+      localStorage.removeItem('demo_vendedores');
+      localStorage.removeItem('demo_proveedores');
+      localStorage.removeItem('demo_clientes');
+      localStorage.removeItem('demo_lotes');
+      localStorage.removeItem('demo_productos');
+      localStorage.removeItem('demo_ventas');
+      localStorage.removeItem('demo_egresos');
+      localStorage.removeItem('demo_modelos');
+      localStorage.removeItem('demo_colores');
+      localStorage.removeItem('demo_capacidades');
+      
+      const defaultSellers = [
+        { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' }
+      ];
+      localStorage.setItem('demo_vendedores', JSON.stringify(defaultSellers));
+      this.initLocalDemo();
+      return true;
+    } else {
+      try {
+        const tablesToDelete = ['egresos', 'ventas', 'productos', 'lotes', 'modelos', 'clientes', 'proveedores', 'vendedores'];
+        for (const table of tablesToDelete) {
+          const { error } = await this.supabase.from(table).delete().neq('id', '_dummy_id_');
+          if (error) throw error;
+        }
+        
+        try {
+          await this.supabase.from('colores').delete().neq('id', '_dummy_id_');
+          await this.supabase.from('capacidades').delete().neq('id', '_dummy_id_');
+        } catch (e) {
+          console.warn("No se pudieron limpiar las tablas opcionales de catálogos en Supabase", e);
+        }
+
+        // Insertar vendedor admin principal
+        const defaultSellers = [
+          { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' }
+        ];
+        const { error: errSellers } = await this.supabase.from('vendedores').insert(defaultSellers);
+        if (errSellers) throw errSellers;
+
+        await this.syncAll();
+        return true;
+      } catch (err) {
+        console.error("Error al vaciar base de datos en Supabase:", err);
+        alert(`Error al vaciar Supabase: ${err.message || err}`);
         return false;
       }
     }

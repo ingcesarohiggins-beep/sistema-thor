@@ -2520,3 +2520,46 @@ async function deleteCatalogItem(type, id) {
     alert("Error al eliminar del catálogo: " + e.message);
   }
 }
+
+// Vaciar Base de Datos Completa (Con Cuádruple Validación)
+async function triggerWipeDatabase() {
+  const pwd = prompt("Ingrese la contraseña de seguridad para proceder a vaciar la base de datos:");
+  if (pwd !== 'cesar1996') {
+    alert("Contraseña incorrecta. Operación cancelada.");
+    return;
+  }
+
+  if (!confirm("⚠️ ADVERTENCIA 1 DE 3: Esta acción borrará permanentemente TODOS los registros de productos, clientes, lotes, ventas y egresos. ¿Está seguro de que desea continuar?")) {
+    return;
+  }
+
+  if (!confirm("⚠️ ADVERTENCIA 2 DE 3: Se perderá toda la información comercial y de inventario. Esto dejará el sistema completamente vacío para empezar de cero. ¿Realmente desea continuar?")) {
+    return;
+  }
+
+  const phrase = prompt("⚠️ ADVERTENCIA FINAL: Para confirmar el vaciado completo, escriba la palabra 'ELIMINAR' en la siguiente caja:");
+  if (!phrase || phrase.trim().toUpperCase() !== 'ELIMINAR') {
+    alert("Confirmación incorrecta. Operación cancelada.");
+    return;
+  }
+
+  const btn = document.querySelector('[onclick="triggerWipeDatabase()"]');
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Vaciando Base de Datos...';
+  btn.disabled = true;
+
+  try {
+    const success = await DB.wipeDatabaseCompletely();
+    if (success) {
+      alert("Base de datos vaciada por completo. Se ha conservado únicamente el usuario Administrador Principal (admin@thor.com).");
+      window.location.reload();
+    } else {
+      alert("Error al vaciar la base de datos.");
+    }
+  } catch (e) {
+    alert("Ocurrió un error al intentar vaciar la base de datos: " + e.message);
+  } finally {
+    btn.innerHTML = originalHtml;
+    btn.disabled = false;
+  }
+}
