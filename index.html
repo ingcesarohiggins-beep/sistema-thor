@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Estilos Personalizados -->
   <link rel="stylesheet" href="css/styles.css?v=1.0.5">
+  <!-- Cliente de Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   
@@ -35,10 +37,10 @@
     </div>
   </div>
   
-  <!-- BANNER DE ESTADO DE CONEXIÓN DE GOOGLE SHEETS -->
+  <!-- BANNER DE ESTADO DE CONEXIÓN DE SUPABASE -->
   <div id="connection-status-banner" style="background-color: var(--color-warning); text-align: center; padding: 10px 16px; font-size: 13px; color: #0b0f19; font-weight: 700; width: 100%; z-index: 1000; position: fixed; top: 0; left: 0; display: flex; align-items: center; justify-content: center; gap: 8px;">
     <i class="fa-solid fa-circle-exclamation"></i>
-    <span id="connection-status-text">Operando en "Modo Demo" (LocalStorage). Conecta Google Sheets en Configuración.</span>
+    <span id="connection-status-text">Operando en "Modo Demo" (LocalStorage). Conecta Supabase en Configuración.</span>
   </div>
 
   <div class="app-container" style="margin-top: 39px;">
@@ -649,19 +651,23 @@
             <!-- Ajustes de Sistema y Nube -->
             <div style="display: flex; flex-direction: column; gap: 24px;">
               
-              <!-- CONEXIÓN DE GOOGLE SHEETS -->
+              <!-- CONEXIÓN DE SUPABASE -->
               <div class="glass-card" style="display: flex; flex-direction: column; gap: 16px;">
-                <h3>🔌 Configuración de Google Sheets</h3>
-                <p style="font-size: 13px; color: var(--text-muted);">Conecta la base de datos de la nube pegando la URL de tu implementación de Google Apps Script.</p>
+                <h3>🔌 Configuración de Supabase</h3>
+                <p style="font-size: 13px; color: var(--text-muted);">Conecta la base de datos de la nube introduciendo la URL del proyecto y la clave pública anónima (Anon Key).</p>
                 <div class="form-group">
-                  <label for="sheets-url-input">URL del Apps Script (Web App)</label>
-                  <input type="text" id="sheets-url-input" class="form-control" placeholder="https://script.google.com/macros/s/.../exec">
+                  <label for="supabase-url-input">URL de Supabase</label>
+                  <input type="text" id="supabase-url-input" class="form-control" placeholder="https://xxxx.supabase.co">
+                </div>
+                <div class="form-group">
+                  <label for="supabase-key-input">Clave Anon Key de Supabase</label>
+                  <input type="text" id="supabase-key-input" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5c...">
                 </div>
                 <div style="display: flex; gap: 8px;">
-                  <button class="btn btn-primary btn-sm" onclick="saveSheetsConfiguration()">
+                  <button class="btn btn-primary btn-sm" onclick="saveSupabaseConfiguration()">
                     <i class="fa-solid fa-cloud-arrow-up"></i> Conectar y Guardar
                   </button>
-                  <button class="btn btn-secondary btn-sm" onclick="testSheetsConnection()">
+                  <button class="btn btn-secondary btn-sm" onclick="testSupabaseConnection()">
                     <i class="fa-solid fa-arrows-spin"></i> Probar Conexión
                   </button>
                 </div>

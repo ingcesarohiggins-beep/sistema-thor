@@ -4,49 +4,33 @@
 // Si no hay URL, opera en "Modo Demo" con LocalStorage y mocks locales.
 
 const DB = {
-  apiURL: null,
+  supabaseUrl: null,
+  supabaseKey: null,
+  supabase: null,
   cache: {},
   isDemoMode: true,
 
   // Inicialización
   async init() {
-    // Configurar la URL provista por el usuario como valor predeterminado
-    const defaultUrl = 'https://script.google.com/macros/s/AKfycbwNuoqtEyxS9JWgeITZ1EXQq3WPXFWhIG4JevEljiLyMeBzyd5j6ZfSmhHNsi9cIyvWfA/exec';
+    this.supabaseUrl = localStorage.getItem('cel_supabase_url');
+    this.supabaseKey = localStorage.getItem('cel_supabase_key');
     
-    // Limpieza de caché local antigua si existía de sesiones anteriores de pruebas
-    const localSellers = JSON.parse(localStorage.getItem('demo_vendedores')) || [];
-    const hasThorLocal = localSellers.some(s => s.usuario === 'admin@thor.com');
-    if (!hasThorLocal && localStorage.getItem('demo_vendedores')) {
-      console.log("Limpiando caché local antigua para actualizar credenciales de Thor...");
-      localStorage.removeItem('demo_vendedores');
-      localStorage.removeItem('demo_proveedores');
-      localStorage.removeItem('demo_clientes');
-      localStorage.removeItem('demo_lotes');
-      localStorage.removeItem('demo_productos');
-      localStorage.removeItem('demo_ventas');
-      localStorage.removeItem('demo_egresos');
-      localStorage.removeItem('demo_modelos');
-    }
-
-    // Forzar la última URL provista para evitar conflictos con URLs antiguas en caché de LocalStorage
-    const storedUrl = localStorage.getItem('cel_google_sheet_url');
-    if (storedUrl !== defaultUrl) {
-      console.log("Actualizando URL de base de datos a la última versión configurada...");
-      localStorage.setItem('cel_google_sheet_url', defaultUrl);
-      this.apiURL = defaultUrl;
-    } else {
-      this.apiURL = storedUrl || defaultUrl;
-    }
-    
-    if (this.apiURL) {
-      this.isDemoMode = false;
-      const connected = await this.syncAll();
-      if (!connected) {
-        console.warn("Fallo al conectar con Google Sheets. Iniciando en Modo Demo.");
+    if (this.supabaseUrl && this.supabaseKey) {
+      try {
+        this.supabase = window.supabase.createClient(this.supabaseUrl, this.supabaseKey);
+        this.isDemoMode = false;
+        const connected = await this.syncAll();
+        if (!connected) {
+          console.warn("Fallo al conectar con Supabase. Iniciando en Modo Demo.");
+          this.isDemoMode = true;
+          this.initLocalDemo();
+        } else {
+          await this.autoHealProducts();
+        }
+      } catch (e) {
+        console.error("Fallo al inicializar cliente Supabase:", e);
         this.isDemoMode = true;
         this.initLocalDemo();
-      } else {
-        await this.autoHealProducts();
       }
     } else {
       this.isDemoMode = true;
@@ -123,105 +107,82 @@ const DB = {
     });
   },
 
-  // Sincronizar todos los datos desde Google Sheets (GET)
+  // Sincronizar todos los datos desde Supabase (GET)
   async syncAll() {
-    if (!this.apiURL) return false;
+    if (!this.supabase) return false;
     try {
-      const res = await fetch(`${this.apiURL}?action=getAll&_=${Date.now()}`, { method: 'GET' });
-      const json = await res.json();
-      if (json.status === 'success') {
-        this.cache = json.data;
-        
-        // BOOTSTRAP AUTOMÁTICO: Si la base de datos en la nube está vacía de usuarios, inicializarla
-        if (!this.cache.vendedores || this.cache.vendedores.length === 0) {
-          console.log("Inicializando base de datos vacía en Google Sheets...");
-          await this.bootstrapGoogleSheets();
+      const tables = ['vendedores', 'proveedores', 'clientes', 'modelos', 'lotes', 'productos', 'ventas', 'egresos'];
+      const promises = tables.map(table => this.supabase.from(table).select('*'));
+      const results = await Promise.all(promises);
+      
+      const newCache = {};
+      for (let i = 0; i < tables.length; i++) {
+        const { data, error } = results[i];
+        if (error) {
+          console.error(`Error al cargar tabla ${tables[i]}:`, error);
+          return false;
         }
-        return true;
+        newCache[tables[i]] = data || [];
       }
-      return false;
+      
+      this.cache = newCache;
+      return true;
     } catch (e) {
-      console.error("Error al sincronizar con Google Sheets:", e);
+      console.error("Error al sincronizar con Supabase:", e);
       return false;
     }
   },
 
-  // Inicialización automática de datos requeridos en Google Sheets
-  async bootstrapGoogleSheets() {
-    const defaultSellers = [
-      { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' },
-      { id: 'v-2', nombre: 'Vendedor Uno', usuario: 'vendedor1@thor.com', contrasena: 'ventasthor1', rol: 'vendedor' },
-      { id: 'v-3', nombre: 'Vendedor Dos', usuario: 'vendedor2@thor.com', contrasena: 'ventasthor2', rol: 'vendedor' }
-    ];
-    for (let s of defaultSellers) {
-      await this.saveRow('vendedores', s);
-    }
-
-    const defaultModels = [
-      { id: 'm-1', marca: 'Samsung', modelo: 'Samsung Galaxy S23 Ultra', tipo: 'Celular' },
-      { id: 'm-2', marca: 'Xiaomi', modelo: 'Xiaomi Redmi Note 13 Pro', tipo: 'Celular' },
-      { id: 'm-3', marca: 'Apple', modelo: 'iPhone 15 Pro Max', tipo: 'Celular' },
-      { id: 'm-4', marca: 'Lenovo', modelo: 'Laptop Lenovo ThinkPad L14', tipo: 'Laptop' },
-      { id: 'm-5', marca: 'Genérico', modelo: 'Cargador Rápido Tipo-C 25W', tipo: 'Cargador' },
-      { id: 'm-6', marca: 'Genérico', modelo: 'Cable Trenzado Tipo-C a C 2m', tipo: 'Cable' }
-    ];
-    for (let m of defaultModels) {
-      await this.saveRow('modelos', m);
-    }
-
-    // Cargar proveedores iniciales de prueba
-    const defaultProviders = [
-      { id: 'p-1', nombre: 'Celular Express Mayorista', telefono: '+57 312 4567890', email: 'ventas@celularexpress.com' },
-      { id: 'p-2', nombre: 'Accesorios & Cargas SAS', telefono: '+57 300 9876543', email: 'contacto@accesorioscargas.com' }
-    ];
-    for (let p of defaultProviders) {
-      await this.saveRow('proveedores', p);
-    }
-
-    // Cargar clientes iniciales de prueba
-    const defaultClients = [
-      { id: 'c-general', nombre: 'Cliente General (Venta Rápida)', documento: '99999999', telefono: '00000000' },
-      { id: 'c-1', nombre: 'María Camila Ortega', documento: '1098765432', telefono: '+57 315 2223344' }
-    ];
-    for (let c of defaultClients) {
-      await this.saveRow('clientes', c);
-    }
-
-    // Volver a descargar todo ya inicializado
-    const res = await fetch(`${this.apiURL}?action=getAll&_=${Date.now()}`, { method: 'GET' });
-    const json = await res.json();
-    if (json.status === 'success') {
-      this.cache = json.data;
-    }
-  },
-
-  // Establecer y validar la URL de conexión
-  async setGoogleSheetsUrl(url) {
-    if (!url || url.trim() === '') {
-      localStorage.removeItem('cel_google_sheet_url');
-      this.apiURL = null;
+  // Guardar y probar configuración de Supabase
+  async setSupabaseConfig(url, key) {
+    if (!url || !key || url.trim() === '' || key.trim() === '') {
+      localStorage.removeItem('cel_supabase_url');
+      localStorage.removeItem('cel_supabase_key');
+      this.supabaseUrl = null;
+      this.supabaseKey = null;
+      this.supabase = null;
       this.isDemoMode = true;
       this.initLocalDemo();
-      return { success: true, message: 'URL limpiada. Modo demo activado.' };
+      return { success: true, message: 'Configuración de Supabase eliminada. Modo demo activado.' };
     }
 
     try {
-      const res = await fetch(`${url}?action=getAll&_=${Date.now()}`, { method: 'GET' });
-      const json = await res.json();
-      if (json.status === 'success') {
-        localStorage.setItem('cel_google_sheet_url', url);
-        this.apiURL = url;
-        this.isDemoMode = false;
-        this.cache = json.data;
-        
-        if (!this.cache.vendedores || this.cache.vendedores.length === 0) {
-          await this.bootstrapGoogleSheets();
-        }
-        return { success: true, message: '¡Conexión establecida con éxito!' };
+      const testClient = window.supabase.createClient(url, key);
+      const { data, error } = await testClient.from('vendedores').select('*').limit(1);
+      if (error) {
+        return { success: false, message: `Error al conectar a Supabase: ${error.message}` };
       }
-      return { success: false, message: 'La URL no devolvió una estructura válida.' };
+      
+      localStorage.setItem('cel_supabase_url', url);
+      localStorage.setItem('cel_supabase_key', key);
+      this.supabaseUrl = url;
+      this.supabaseKey = key;
+      this.supabase = testClient;
+      this.isDemoMode = false;
+      
+      const connected = await this.syncAll();
+      if (!connected) {
+        return { success: false, message: 'Se conectó pero falló la sincronización de las tablas.' };
+      }
+      return { success: true, message: '¡Conexión y sincronización con Supabase establecidas con éxito!' };
     } catch (e) {
-      return { success: false, message: 'No se pudo conectar a la URL. Verifica CORS o acceso público.' };
+      return { success: false, message: `No se pudo conectar a Supabase. Detalle: ${e.message}` };
+    }
+  },
+
+  async testSupabaseConfig(url, key) {
+    if (!url || !key) {
+      return { success: false, message: 'La URL y la clave Anon Key son obligatorias.' };
+    }
+    try {
+      const testClient = window.supabase.createClient(url, key);
+      const { data, error } = await testClient.from('vendedores').select('*').limit(1);
+      if (error) {
+        return { success: false, message: `Error en la prueba de conexión: ${error.message}` };
+      }
+      return { success: true, message: '¡Prueba de conexión exitosa! Supabase responde correctamente.' };
+    } catch (e) {
+      return { success: false, message: `Error de red o conexión: ${e.message}` };
     }
   },
 
@@ -234,48 +195,43 @@ const DB = {
   async saveRow(sheetName, rowData) {
     const collection = this.getCollection(sheetName);
     
+    if (!rowData.id) {
+      rowData.id = sheetName.substring(0, 3) + '-' + Date.now();
+    }
+
     if (this.isDemoMode) {
       // Guardado Local (Modo Demo)
-      if (rowData.id) {
-        const idx = collection.findIndex(item => item.id === rowData.id);
-        if (idx !== -1) collection[idx] = rowData;
+      const idx = collection.findIndex(item => item.id === rowData.id);
+      if (idx !== -1) {
+        collection[idx] = rowData;
       } else {
-        rowData.id = sheetName.substring(0, 3) + '-' + Date.now();
         collection.push(rowData);
       }
       this.cache[sheetName] = collection;
       localStorage.setItem('demo_' + sheetName, JSON.stringify(collection));
       return rowData;
     } else {
-      // Guardado en la Nube (Google Sheets)
+      // Guardado en la Nube (Supabase)
       try {
-        const res = await fetch(this.apiURL, {
-          method: 'POST',
-          redirect: 'follow', // Muy importante para redirecciones de Google Apps Script
-          body: JSON.stringify({
-            action: 'save',
-            sheetName: sheetName,
-            row: rowData
-          })
-        });
-        const json = await res.json();
-        if (json.status === 'success') {
-          // Actualizar caché
-          const savedRow = json.data;
-          const idx = collection.findIndex(item => item.id === savedRow.id);
-          if (idx !== -1) {
-            collection[idx] = savedRow;
-          } else {
-            collection.push(savedRow);
-          }
-          this.cache[sheetName] = collection;
-          return savedRow;
+        const { data, error } = await this.supabase
+          .from(sheetName)
+          .upsert(rowData)
+          .select();
+        
+        if (error) throw error;
+        
+        const savedRow = (data && data[0]) ? data[0] : rowData;
+        const idx = collection.findIndex(item => item.id === savedRow.id);
+        if (idx !== -1) {
+          collection[idx] = savedRow;
         } else {
-          throw new Error(json.message);
+          collection.push(savedRow);
         }
+        this.cache[sheetName] = collection;
+        return savedRow;
       } catch (err) {
-        console.error("Error al guardar fila en Sheets:", err);
-        alert("Error de conexión al guardar datos en Google Sheets. Se reintentará.");
+        console.error(`Error al guardar fila en Supabase (${sheetName}):`, err);
+        alert(`Error de conexión al guardar datos en Supabase: ${err.message || err}`);
         throw err;
       }
     }
@@ -291,23 +247,18 @@ const DB = {
       return true;
     } else {
       try {
-        const res = await fetch(this.apiURL, {
-          method: 'POST',
-          redirect: 'follow',
-          body: JSON.stringify({
-            action: 'delete',
-            sheetName: sheetName,
-            id: id
-          })
-        });
-        const json = await res.json();
-        if (json.status === 'success') {
-          this.cache[sheetName] = collection.filter(item => item.id !== id);
-          return true;
-        }
-        throw new Error(json.message);
+        const { error } = await this.supabase
+          .from(sheetName)
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+        
+        this.cache[sheetName] = collection.filter(item => item.id !== id);
+        return true;
       } catch (err) {
-        console.error("Error al eliminar fila en Sheets:", err);
+        console.error(`Error al eliminar fila en Supabase (${sheetName}):`, err);
+        alert(`Error al eliminar datos en Supabase: ${err.message || err}`);
         throw err;
       }
     }
@@ -606,19 +557,76 @@ const DB = {
       return true;
     } else {
       try {
-        const res = await fetch(this.apiURL, {
-          method: 'POST',
-          redirect: 'follow',
-          body: JSON.stringify({ action: 'reset' })
-        });
-        const json = await res.json();
-        if (json.status === 'success') {
-          await this.syncAll();
-          return true;
+        // Eliminar en orden de dependencias para evitar violaciones de clave foránea
+        const tablesToDelete = ['egresos', 'ventas', 'productos', 'lotes', 'modelos', 'clientes', 'proveedores', 'vendedores'];
+        for (const table of tablesToDelete) {
+          const { error } = await this.supabase.from(table).delete().neq('id', '_dummy_id_');
+          if (error) throw error;
         }
-        return false;
+
+        // Insertar vendedores iniciales
+        const defaultSellers = [
+          { id: 'v-1', nombre: 'Administrador Thor', usuario: 'admin@thor.com', contrasena: 'thor1996', rol: 'admin' },
+          { id: 'v-2', nombre: 'Vendedor Uno', usuario: 'vendedor1@thor.com', contrasena: 'ventasthor1', rol: 'vendedor' },
+          { id: 'v-3', nombre: 'Vendedor Dos', usuario: 'vendedor2@thor.com', contrasena: 'ventasthor2', rol: 'vendedor' }
+        ];
+        const { error: errSellers } = await this.supabase.from('vendedores').insert(defaultSellers);
+        if (errSellers) throw errSellers;
+
+        // Insertar proveedores iniciales
+        const defaultProviders = [
+          { id: 'p-1', nombre: 'Celular Express Mayorista', telefono: '+57 312 4567890', email: 'ventas@celularexpress.com' },
+          { id: 'p-2', nombre: 'Accesorios & Cargas SAS', telefono: '+57 300 9876543', email: 'contacto@accesorioscargas.com' }
+        ];
+        const { error: errProviders } = await this.supabase.from('proveedores').insert(defaultProviders);
+        if (errProviders) throw errProviders;
+
+        // Insertar clientes iniciales
+        const defaultClients = [
+          { id: 'c-general', nombre: 'Cliente General (Venta Rápida)', documento: '99999999', telefono: '00000000' },
+          { id: 'c-1', nombre: 'María Camila Ortega', documento: '1098765432', telefono: '+57 315 2223344' }
+        ];
+        const { error: errClients } = await this.supabase.from('clientes').insert(defaultClients);
+        if (errClients) throw errClients;
+
+        // Insertar modelos iniciales
+        const defaultModels = [
+          { id: 'm-1', marca: 'Apple', modelo: 'iPhone 11 R 64GB', tipo: 'Celular' },
+          { id: 'm-2', marca: 'Apple', modelo: 'iPhone 13 R 128GB', tipo: 'Celular' },
+          { id: 'm-3', marca: 'Apple', modelo: 'iPhone 14 eSIM 128GB', tipo: 'Celular' },
+          { id: 'm-4', marca: 'Apple', modelo: 'iPhone 14 Chip 128GB', tipo: 'Celular' },
+          { id: 'm-5', marca: 'Apple', modelo: 'iPhone 15 128GB', tipo: 'Celular' },
+          { id: 'm-6', marca: 'Apple', modelo: 'iPhone 15 Pro Max eSIM 256GB', tipo: 'Celular' },
+          { id: 'm-7', marca: 'Apple', modelo: 'iPhone 16 Chip 128GB', tipo: 'Celular' },
+          { id: 'm-8', marca: 'Apple', modelo: 'iPhone 16 Chip 256GB', tipo: 'Celular' },
+          { id: 'm-9', marca: 'Apple', modelo: 'iPhone 16 Plus 128GB', tipo: 'Celular' },
+          { id: 'm-10', marca: 'Apple', modelo: 'iPhone 16 Pro Chip 128GB', tipo: 'Celular' },
+          { id: 'm-11', marca: 'Apple', modelo: 'iPhone 16 Pro Max Chip 256GB', tipo: 'Celular' },
+          { id: 'm-12', marca: 'Apple', modelo: 'iPhone 17 Chip 256GB', tipo: 'Celular' },
+          { id: 'm-13', marca: 'Apple', modelo: 'iPhone 17 eSIM 256GB', tipo: 'Celular' },
+          { id: 'm-14', marca: 'Apple', modelo: 'iPhone 17 Pro eSIM 256GB', tipo: 'Celular' },
+          { id: 'm-15', marca: 'Apple', modelo: 'iPhone 17 Pro Chip 256GB', tipo: 'Celular' },
+          { id: 'm-16', marca: 'Apple', modelo: 'iPhone 17 Pro eSIM 512GB', tipo: 'Celular' },
+          { id: 'm-17', marca: 'Apple', modelo: 'iPhone 17 Pro Chip 1TB', tipo: 'Celular' },
+          { id: 'm-18', marca: 'Apple', modelo: 'iPhone 17 Pro Max eSIM 256GB', tipo: 'Celular' },
+          { id: 'm-19', marca: 'Apple', modelo: 'iPhone 17 Pro Max Chip 256GB', tipo: 'Celular' },
+          { id: 'm-20', marca: 'Apple', modelo: 'iPhone 17 Pro Max eSIM 512GB', tipo: 'Celular' },
+          { id: 'm-21', marca: 'Apple', modelo: 'iPhone 17 Pro Max Chip 512GB', tipo: 'Celular' },
+          { id: 'm-22', marca: 'Apple', modelo: 'iPhone 17 Pro Max eSIM 1TB', tipo: 'Celular' },
+          { id: 'm-23', marca: 'Apple', modelo: 'MacBook Pro 14" M3 (8GB/512GB)', tipo: 'Laptop' },
+          { id: 'm-24', marca: 'Apple', modelo: 'MacBook Pro 14" M3 Pro (18GB/512GB)', tipo: 'Laptop' },
+          { id: 'm-25', marca: 'Apple', modelo: 'MacBook Pro 16" M3 Max (36GB/1TB)', tipo: 'Laptop' },
+          { id: 'm-26', marca: 'Genérico', modelo: 'Cargador Rápido Tipo-C 20W', tipo: 'Cargador' },
+          { id: 'm-27', marca: 'Genérico', modelo: 'Cable USB-C a Lightning 1m', tipo: 'Cable' }
+        ];
+        const { error: errModels } = await this.supabase.from('modelos').insert(defaultModels);
+        if (errModels) throw errModels;
+
+        await this.syncAll();
+        return true;
       } catch (err) {
-        console.error("Error al resetear Sheets:", err);
+        console.error("Error al resetear base de datos en Supabase:", err);
+        alert(`Error al formatear Supabase: ${err.message || err}`);
         return false;
       }
     }

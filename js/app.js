@@ -50,9 +50,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateConnectionStatusUI();
   updateCurrentDate();
   
-  // Cargar URL en el input de configuración si existe
-  if (DB.apiURL) {
-    document.getElementById('sheets-url-input').value = DB.apiURL;
+  // Cargar Supabase en los inputs de configuración si existen
+  if (DB.supabaseUrl) {
+    document.getElementById('supabase-url-input').value = DB.supabaseUrl;
+  }
+  if (DB.supabaseKey) {
+    document.getElementById('supabase-key-input').value = DB.supabaseKey;
   }
 
   // Verificar si hay sesión activa guardada
@@ -77,7 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   showLoginScreen();
 });
 
-// --- GESTIÓN DE BANNER DE CONEXIÓN DE GOOGLE SHEETS ---
+// --- GESTIÓN DE BANNER DE CONEXIÓN DE SUPABASE ---
 function updateConnectionStatusUI() {
   const banner = document.getElementById('connection-status-banner');
   const text = document.getElementById('connection-status-text');
@@ -85,11 +88,11 @@ function updateConnectionStatusUI() {
   if (DB.isDemoMode) {
     banner.style.backgroundColor = 'var(--color-warning)';
     banner.style.color = '#0b0f19';
-    text.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Operando en "Modo Demo" (LocalStorage). Conecta tu base de datos de Google Sheets en la pestaña Administración.';
+    text.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Operando en "Modo Demo" (LocalStorage). Conecta tu base de datos de Supabase en la pestaña Administración.';
   } else {
     banner.style.backgroundColor = 'var(--color-success)';
     banner.style.color = '#ffffff';
-    text.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Conectado a Google Sheets (Nube) | Base de datos activa y sincronizada en tiempo real.';
+    text.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Conectado a Supabase (Nube) | Base de datos activa y sincronizada en tiempo real.';
   }
 }
 
@@ -1273,7 +1276,7 @@ function openEditProductModal(id) {
 
 async function deleteProduct(id) {
   if (confirm("¿Está seguro de que desea eliminar este producto del almacén?")) {
-    if (confirm("¡ATENCIÓN! Esta acción es irreversible y se eliminará el producto permanentemente de la base de datos de Google Sheets. ¿Realmente desea confirmar la eliminación definitiva?")) {
+    if (confirm("¡ATENCIÓN! Esta acción es irreversible y se eliminará el producto permanentemente de la base de datos de Supabase. ¿Realmente desea confirmar la eliminación definitiva?")) {
       try {
         await DB.deleteProduct(id);
         renderInventory();
@@ -1406,7 +1409,7 @@ async function submitProductBaja(event) {
       alert("Error al dar de baja el producto.");
     }
   } catch (e) {
-    alert("Error de conexión con Sheets.");
+    alert("Error de conexión con la base de datos.");
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerHTML = originalText;
@@ -1887,16 +1890,17 @@ async function deleteSeller(id) {
   }
 }
 
-// --- AJUSTES GOOGLE SHEETS DESDE FRONTEND ---
-async function saveSheetsConfiguration() {
-  const url = document.getElementById('sheets-url-input').value.trim();
+// --- AJUSTES SUPABASE DESDE FRONTEND ---
+async function saveSupabaseConfiguration() {
+  const url = document.getElementById('supabase-url-input').value.trim();
+  const key = document.getElementById('supabase-key-input').value.trim();
   
-  const btn = document.querySelector('[onclick="saveSheetsConfiguration()"]');
+  const btn = document.querySelector('[onclick="saveSupabaseConfiguration()"]');
   const originalHtml = btn.innerHTML;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Conectando...';
   btn.disabled = true;
 
-  const result = await DB.setGoogleSheetsUrl(url);
+  const result = await DB.setSupabaseConfig(url, key);
   
   btn.innerHTML = originalHtml;
   btn.disabled = false;
@@ -1907,17 +1911,18 @@ async function saveSheetsConfiguration() {
   }
 }
 
-async function testSheetsConnection() {
-  const url = document.getElementById('sheets-url-input').value.trim();
-  if (!url) {
-    alert("Por favor ingresa una URL antes de probar.");
+async function testSupabaseConnection() {
+  const url = document.getElementById('supabase-url-input').value.trim();
+  const key = document.getElementById('supabase-key-input').value.trim();
+  if (!url || !key) {
+    alert("Por favor ingresa la URL y el Anon Key antes de probar.");
     return;
   }
-  const btn = document.querySelector('[onclick="testSheetsConnection()"]');
+  const btn = document.querySelector('[onclick="testSupabaseConnection()"]');
   const originalHtml = btn.innerHTML;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Probando...';
   
-  const result = await DB.setGoogleSheetsUrl(url);
+  const result = await DB.testSupabaseConfig(url, key);
   btn.innerHTML = originalHtml;
   
   alert(result.message);
