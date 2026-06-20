@@ -14,7 +14,7 @@ const SCHEMAS = {
   proveedores: ['id', 'nombre', 'telefono', 'email'],
   clientes: ['id', 'nombre', 'documento', 'telefono'],
   lotes: ['id', 'nombre', 'proveedorId', 'flete', 'fecha'],
-  productos: ['id', 'loteId', 'tipo', 'modelo', 'color', 'tipoCodigo', 'codigo', 'costoBase', 'costoReal', 'precioSugerido', 'precioVenta', 'stock', 'estado', 'foto'],
+  productos: ['id', 'loteId', 'tipo', 'modelo', 'color', 'tipoCodigo', 'codigo', 'costoBase', 'costoReal', 'precioSugerido', 'precioVenta', 'stock', 'estado', 'foto', 'bajaDetalle'],
   ventas: ['id', 'clienteId', 'vendedorId', 'fecha', 'total', 'articulos', 'metodoPago', 'referencia'],
   egresos: ['id', 'descripcion', 'monto', 'fecha', 'vendedorId'],
   modelos: ['id', 'marca', 'modelo', 'tipo']

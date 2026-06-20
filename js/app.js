@@ -11,6 +11,36 @@ let reemplazoPhotoBase64 = '';
 let cameraStream = null;
 let cashflowChart = null;
 
+// Compresión de fotos utilitaria para evitar payloads pesados en Google Sheets (Max 500px y 50% calidad JPEG ~10KB-15KB)
+function compressImage(base64Str, maxDim = 500, quality = 0.5) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = function() {
+      resolve(base64Str); // Fallback
+    };
+    img.src = base64Str;
+  });
+}
+
 // Inicialización al cargar la página
 document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar DB (Carga local u obtiene Sheets si está guardado)
@@ -1077,8 +1107,8 @@ function handlePhotoUpload(event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
-    productPhotoBase64 = e.target.result;
+  reader.onload = async function(e) {
+    productPhotoBase64 = await compressImage(e.target.result);
     const img = document.getElementById('photo-preview-img');
     img.src = productPhotoBase64;
     img.style.display = 'block';
@@ -1111,15 +1141,27 @@ function startCameraForPhoto() {
     alert("No se pudo acceder a la cámara trasera: " + err.message);
   });
 
-  btnCapture.onclick = function() {
+  btnCapture.onclick = async function() {
     const canvas = document.getElementById('camera-canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const maxDim = 500;
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) {
+        h = Math.round((h * maxDim) / w);
+        w = maxDim;
+      } else {
+        w = Math.round((w * maxDim) / h);
+        h = maxDim;
+      }
+    }
+    canvas.width = w;
+    canvas.height = h;
     
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, w, h);
     
-    productPhotoBase64 = canvas.toDataURL('image/jpeg');
+    productPhotoBase64 = canvas.toDataURL('image/jpeg', 0.5);
     
     const img = document.getElementById('photo-preview-img');
     img.src = productPhotoBase64;
@@ -1259,8 +1301,8 @@ function handleBajaPhotoUpload(event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
-    bajaPhotoBase64 = e.target.result;
+  reader.onload = async function(e) {
+    bajaPhotoBase64 = await compressImage(e.target.result);
     const img = document.getElementById('baja-photo-preview-img');
     img.src = bajaPhotoBase64;
     img.style.display = 'block';
@@ -1289,15 +1331,27 @@ function startCameraForBajaPhoto() {
     alert("Error de cámara: " + err.message);
   });
 
-  btnCapture.onclick = function() {
+  btnCapture.onclick = async function() {
     const canvas = document.getElementById('baja-camera-canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const maxDim = 500;
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) {
+        h = Math.round((h * maxDim) / w);
+        w = maxDim;
+      } else {
+        w = Math.round((w * maxDim) / h);
+        h = maxDim;
+      }
+    }
+    canvas.width = w;
+    canvas.height = h;
     
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
-    bajaPhotoBase64 = canvas.toDataURL('image/jpeg');
+    bajaPhotoBase64 = canvas.toDataURL('image/jpeg', 0.5);
     
     const img = document.getElementById('baja-photo-preview-img');
     img.src = bajaPhotoBase64;
@@ -1336,6 +1390,11 @@ async function submitProductBaja(event) {
     return;
   }
 
+  const submitBtn = event.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registrando Baja...';
+
   try {
     const success = await DB.registrarBajaBurocratica(prodId, motivo, justificacion, bajaPhotoBase64, currentUser.id);
     if (success) {
@@ -1348,6 +1407,9 @@ async function submitProductBaja(event) {
     }
   } catch (e) {
     alert("Error de conexión con Sheets.");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
   }
 }
 
@@ -1369,8 +1431,8 @@ function handleReemplazoPhotoUpload(event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
-    reemplazoPhotoBase64 = e.target.result;
+  reader.onload = async function(e) {
+    reemplazoPhotoBase64 = await compressImage(e.target.result);
     const img = document.getElementById('reem-photo-preview-img');
     img.src = reemplazoPhotoBase64;
     img.style.display = 'block';
@@ -1399,15 +1461,27 @@ function startCameraForReemplazoPhoto() {
     alert("Error de cámara: " + err.message);
   });
 
-  btnCapture.onclick = function() {
+  btnCapture.onclick = async function() {
     const canvas = document.getElementById('reem-camera-canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const maxDim = 500;
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > maxDim || h > maxDim) {
+      if (w > h) {
+        h = Math.round((h * maxDim) / w);
+        w = maxDim;
+      } else {
+        w = Math.round((w * maxDim) / h);
+        h = maxDim;
+      }
+    }
+    canvas.width = w;
+    canvas.height = h;
     
     const ctx = canvas.getContext('2d');
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
-    reemplazoPhotoBase64 = canvas.toDataURL('image/jpeg');
+    reemplazoPhotoBase64 = canvas.toDataURL('image/jpeg', 0.5);
     
     const img = document.getElementById('reem-photo-preview-img');
     img.src = reemplazoPhotoBase64;
@@ -1447,6 +1521,11 @@ async function submitProductReemplazo(event) {
   const nuevoImei = document.getElementById('reemplazo-imei').value.trim();
   const observaciones = document.getElementById('reemplazo-observaciones').value.trim();
 
+  const submitBtn = event.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registrando Reemplazo...';
+
   try {
     const success = await DB.registrarReemplazoGarantia(prodBajaId, nuevoImei, reemplazoPhotoBase64, observaciones, currentUser.id);
     if (success) {
@@ -1459,6 +1538,9 @@ async function submitProductReemplazo(event) {
     }
   } catch (e) {
     alert("Error al conectar con la base de datos.");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
   }
 }
 
