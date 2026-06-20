@@ -26,9 +26,8 @@ const DB = {
 
   // Inicialización
   async init() {
-    this.supabaseUrl = this.sanitizeSupabaseUrl(localStorage.getItem('cel_supabase_url'));
-    this.supabaseKey = localStorage.getItem('cel_supabase_key');
-    if (this.supabaseKey) this.supabaseKey = this.supabaseKey.trim();
+    this.supabaseUrl = 'https://sxhubnprneoyeqaauile.supabase.co';
+    this.supabaseKey = 'sb_publishable_J9VWns-2lGZJsFZ3g7EphA_spg8F9fA';
     
     if (this.supabaseUrl && this.supabaseKey) {
       try {

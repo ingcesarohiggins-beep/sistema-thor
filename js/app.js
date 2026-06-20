@@ -46,17 +46,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar DB (Carga local u obtiene Sheets si está guardado)
   await DB.init();
 
-  // Actualizar UI del estado de conexión de Google Sheets
+  // Actualizar UI del estado de conexión de Supabase
   updateConnectionStatusUI();
   updateCurrentDate();
-  
-  // Cargar Supabase en los inputs de configuración si existen
-  if (DB.supabaseUrl) {
-    document.getElementById('supabase-url-input').value = DB.supabaseUrl;
-  }
-  if (DB.supabaseKey) {
-    document.getElementById('supabase-key-input').value = DB.supabaseKey;
-  }
 
   // Verificar si hay sesión activa guardada
   const activeUserId = localStorage.getItem('cel_active_user_id');
@@ -88,11 +80,11 @@ function updateConnectionStatusUI() {
   if (DB.isDemoMode) {
     banner.style.backgroundColor = 'var(--color-warning)';
     banner.style.color = '#0b0f19';
-    text.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Operando en "Modo Demo" (LocalStorage). Conecta tu base de datos de Supabase en la pestaña Administración.';
+    text.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Desconectado';
   } else {
     banner.style.backgroundColor = 'var(--color-success)';
     banner.style.color = '#ffffff';
-    text.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Conectado a Supabase (Nube) | Base de datos activa y sincronizada en tiempo real.';
+    text.innerHTML = '<i class="fa-solid fa-circle-check"></i> Conectado';
   }
 }
 
